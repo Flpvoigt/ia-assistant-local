@@ -1,0 +1,26 @@
+name: Nova funcionalidade
+description: Proponha uma melhoria para o projeto
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema
+      description: O que precisa ser resolvido?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solucao proposta
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Riscos e permissoes
+      description: Quais dados, dispositivos ou acoes seriam acessados?
+    validations:
+      required: true
+
