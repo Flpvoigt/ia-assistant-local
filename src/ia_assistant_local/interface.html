@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ORÁCULO — Núcleo de IA Local</title>
+<style>
+  :root{
+    --void: #030109;
+    --void-2: #07031a;
+    --panel: rgba(18, 10, 40, 0.55);
+    --panel-border: rgba(150, 110, 255, 0.25);
+    --violet: #8b2fff;
+    --magenta: #ff2fd6;
+    --cyan: #29e6ff;
+    --gold: #ffd23f;
+    --text: #f4f0ff;
+    --text-dim: #a89bd6;
+    --text-faint: #5f5487;
+    --font: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; margin:0; background:var(--void); overflow:hidden; }
+  body{ font-family:var(--font); color:var(--text); }
+  ::selection{ background: rgba(139,47,255,0.4); color:#fff; }
+
+  canvas#stars{ position:fixed; inset:0; z-index:0; }
+
+  .nebula{
+    position:fixed; inset:-10%; z-index:1; pointer-events:none;
+    background:
+      radial-gradient(ellipse 45% 35% at 20% 15%, rgba(139,47,255,0.20), transparent 60%),
+      radial-gradient(ellipse 40% 40% at 85% 20%, rgba(255,47,214,0.14), transparent 60%),
+      radial-gradient(ellipse 50% 45% at 50% 90%, rgba(41,230,255,0.10), transparent 60%);
+    animation: drift 22s ease-in-out infinite alternate;
+    filter: blur(10px);
+  }
+  @keyframes drift{
+    0%{ transform: translate(0,0) scale(1); }
+    100%{ transform: translate(-2%, 2%) scale(1.05); }
+  }
+
+  .vignette{
+    position:fixed; inset:0; z-index:2; pointer-events:none;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(2,1,8,0.85) 100%);
+  }
+
+  /* ================= BOOT / AWAKENING ================= */
+  #boot{
+    position:fixed; inset:0; z-index:100; background:var(--void);
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:22px;
+  }
+  #bootOrb{
+    width:70px; height:70px; border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, #fff, var(--violet) 40%, var(--magenta) 75%, transparent 100%);
+    box-shadow: 0 0 40px 10px rgba(139,47,255,0.6), 0 0 90px 30px rgba(255,47,214,0.25);
+    animation: bootPulse 1.8s ease-in-out infinite;
+  }
+  @keyframes bootPulse{
+    0%,100%{ transform:scale(0.85); }
+    50%{ transform:scale(1.15); }
+  }
+  #bootText{
+    font-family: var(--mono); font-size:12.5px; letter-spacing:0.22em;
+    color: var(--text-dim); text-transform:uppercase; min-height: 20px;
+  }
+  #bootText b{ color: var(--gold); }
+
+  /* ================= APP SHELL ================= */
+  .app{
+    position:relative; z-index:5; height:100dvh;
+    display:grid; grid-template-rows:auto 1fr auto;
+    max-width:900px; margin:0 auto; padding:16px 18px;
+  }
+  .app[hidden]{ display:none; }
+
+  .hud-top{
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .hud-pill{
+    display:flex; align-items:center; gap:8px;
+    background: var(--panel); border:1px solid var(--panel-border);
+    backdrop-filter: blur(12px);
+    padding:7px 14px; border-radius:999px;
+    font-family: var(--mono); font-size:11px; letter-spacing:0.08em; color:var(--text-dim);
+  }
+  .hud-pill b{ color:var(--text); }
+  .pulse-dot{
+    width:7px; height:7px; border-radius:50%; background:var(--cyan);
+    box-shadow:0 0 8px var(--cyan);
+    animation: dotPulse 2s ease-in-out infinite;
+  }
+  .pulse-dot.offline{ background:#ff5470; box-shadow:0 0 8px #ff5470; animation:none; }
+  @keyframes dotPulse{ 50%{ opacity:0.4; } }
+
+  #settingsBtn{
+    background: var(--panel); border:1px solid var(--panel-border); backdrop-filter: blur(12px);
+    width:36px; height:36px; border-radius:50%; color:var(--text-dim); cursor:pointer; font-size:16px;
+    display:flex; align-items:center; justify-content:center; transition: all .2s ease;
+  }
+  #settingsBtn:hover{ color:#fff; border-color: var(--violet); box-shadow:0 0 16px rgba(139,47,255,0.5); transform:rotate(35deg); }
+
+  /* ================= CORE / HALO ================= */
+  .core-zone{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding: 8px 0 4px;
+    flex-shrink:0;
+  }
+  .halo{
+    position:relative; width:200px; height:200px;
+    display:flex; align-items:center; justify-content:center;
+    transition: transform .15s ease-out;
+  }
+  .orb{
+    width:76px; height:76px; border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, #fff, var(--violet) 35%, var(--magenta) 70%, transparent 100%);
+    box-shadow:
+      0 0 40px 6px rgba(139,47,255,0.65),
+      0 0 90px 20px rgba(255,47,214,0.28),
+      0 0 140px 40px rgba(41,230,255,0.12);
+    animation: orbBreathe 3.6s ease-in-out infinite;
+    filter: hue-rotate(0deg);
+    z-index:3;
+  }
+  .halo.active .orb{
+    animation: orbBreatheFast 0.9s ease-in-out infinite;
+  }
+  @keyframes orbBreathe{
+    0%,100%{ transform:scale(0.94); filter:hue-rotate(0deg); }
+    50%{ transform:scale(1.06); filter:hue-rotate(25deg); }
+  }
+  @keyframes orbBreatheFast{
+    0%,100%{ transform:scale(0.92); filter:hue-rotate(0deg); }
+    50%{ transform:scale(1.18); filter:hue-rotate(60deg); }
+  }
+
+  .rings{ position:absolute; inset:0; width:100%; height:100%; z-index:2; }
+  .ring{ fill:none; stroke-width:1; }
+  .ring1{ stroke: rgba(41,230,255,0.55); stroke-dasharray: 4 10; animation: spin 14s linear infinite; }
+  .ring2{ stroke: rgba(255,210,63,0.5); stroke-dasharray: 2 3 30 3; animation: spin 22s linear infinite reverse; }
+  .ring3{ stroke: rgba(255,47,214,0.35); stroke-dasharray: 1 6; animation: spin 9s linear infinite; }
+  .halo.active .ring1{ animation-duration:4s; }
+  .halo.active .ring2{ animation-duration:6s; }
+  .halo.active .ring3{ animation-duration:2.4s; }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  .orbit-particles{ position:absolute; inset:0; z-index:1; pointer-events:none; }
+  .orbit-particles i{
+    position:absolute; top:50%; left:50%; width:3px; height:3px; border-radius:50%;
+    background: var(--gold); box-shadow:0 0 6px var(--gold);
+  }
+
+  .deity-name{
+    margin: 14px 0 2px; font-size: 34px; font-weight:800; letter-spacing:0.05em;
+    background: linear-gradient(90deg, var(--cyan), #fff 45%, var(--magenta));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow: 0 0 30px rgba(139,47,255,0.35);
+  }
+  .deity-sub{
+    margin:0; font-size:12.5px; letter-spacing:0.12em; color:var(--text-faint); text-transform:uppercase;
+  }
+
+  /* ================= CHAT ================= */
+  .chat-zone{ min-height:0; overflow-y:auto; padding: 10px 4px 6px; display:flex; flex-direction:column; gap:14px; }
+  .chat-zone::-webkit-scrollbar{ width:6px; }
+  .chat-zone::-webkit-scrollbar-thumb{ background: rgba(139,47,255,0.35); border-radius:4px; }
+
+  .msg{ display:flex; gap:10px; opacity:0; transform: translateY(8px); animation: msgIn .35s ease forwards; }
+  @keyframes msgIn{ to{ opacity:1; transform:translateY(0); } }
+  .msg .bubble{
+    max-width: 78%; padding:11px 15px; border-radius:14px; font-size:14.5px; line-height:1.5;
+    white-space:pre-wrap; word-break:break-word;
+  }
+  .msg.user{ justify-content:flex-end; }
+  .msg.user .bubble{
+    background: linear-gradient(135deg, rgba(139,47,255,0.35), rgba(41,230,255,0.18));
+    border:1px solid rgba(139,47,255,0.4);
+    border-bottom-right-radius:4px;
+  }
+  .msg.assistant .bubble{
+    background: var(--panel); border:1px solid var(--panel-border); backdrop-filter: blur(10px);
+    border-bottom-left-radius:4px;
+  }
+  .msg.system{ justify-content:center; }
+  .msg.system .bubble{
+    background:transparent; border:1px dashed var(--text-faint); color:var(--text-faint);
+    font-family:var(--mono); font-size:11.5px; letter-spacing:0.03em; text-align:center;
+  }
+  .caret{ display:inline-block; width:6px; height:13px; background:var(--cyan); vertical-align:-2px; margin-left:2px; animation:blink 1s steps(1) infinite; box-shadow:0 0 6px var(--cyan); }
+  @keyframes blink{ 50%{ opacity:0; } }
+
+  /* ================= INPUT ================= */
+  .inputbar{
+    display:flex; align-items:center; gap:10px; margin-top:10px;
+    background: var(--panel); border:1px solid var(--panel-border); backdrop-filter: blur(14px);
+    border-radius:999px; padding:6px 6px 6px 20px;
+    transition: box-shadow .25s ease, border-color .25s ease;
+  }
+  .inputbar:focus-within{
+    border-color: var(--violet);
+    box-shadow: 0 0 0 1px rgba(139,47,255,0.4), 0 0 26px rgba(139,47,255,0.35);
+  }
+  #inputField{
+    flex:1; background:transparent; border:none; color:var(--text); font-size:14.5px; padding:10px 0;
+  }
+  #inputField:focus{ outline:none; }
+  #inputField::placeholder{ color: var(--text-faint); }
+  #sendBtn{
+    flex-shrink:0; width:42px; height:42px; border-radius:50%; border:none; cursor:pointer;
+    background: linear-gradient(135deg, var(--violet), var(--magenta));
+    color:#fff; display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 0 16px rgba(139,47,255,0.5);
+    transition: transform .15s ease;
+  }
+  #sendBtn:hover{ transform: scale(1.08); }
+  #sendBtn:disabled{ opacity:0.4; cursor:not-allowed; transform:none; }
+  #sendBtn svg{ width:17px; height:17px; }
+
+  /* ================= FLASH PULSE ================= */
+  .flash{
+    position:fixed; inset:0; z-index:60; pointer-events:none;
+    background: radial-gradient(circle at 50% 18%, rgba(139,47,255,0.35), transparent 55%);
+    opacity:0; animation: flashFade 0.9s ease forwards;
+  }
+  @keyframes flashFade{ 0%{ opacity:1; } 100%{ opacity:0; } }
+
+  /* ================= MODAL (settings) ================= */
+  .modal-overlay{
+    position:fixed; inset:0; z-index:80; background:rgba(3,1,9,0.7); backdrop-filter: blur(4px);
+    display:flex; align-items:center; justify-content:center;
+    opacity:0; pointer-events:none; transition: opacity .2s ease;
+  }
+  .modal-overlay.show{ opacity:1; pointer-events:auto; }
+  .modal{
+    width:min(420px, 90vw); max-height:85vh; overflow-y:auto;
+    background: linear-gradient(160deg, rgba(24,12,48,0.95), rgba(10,5,24,0.95));
+    border:1px solid var(--panel-border); border-radius:16px; padding:22px;
+    box-shadow: 0 0 60px rgba(139,47,255,0.25);
+    transform: translateY(10px) scale(0.98); transition: transform .2s ease;
+  }
+  .modal-overlay.show .modal{ transform:translateY(0) scale(1); }
+  .modal h2{
+    margin:0 0 16px; font-size:15px; letter-spacing:0.1em; text-transform:uppercase;
+    background: linear-gradient(90deg, var(--cyan), var(--magenta));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .field{ display:flex; flex-direction:column; gap:5px; margin-bottom:14px; }
+  .field label{ font-size:11.5px; color:var(--text-dim); letter-spacing:0.03em; }
+  .field input, .field select{
+    background: rgba(0,0,0,0.35); border:1px solid var(--panel-border); color:var(--text);
+    padding:9px 10px; border-radius:8px; font-size:13px; font-family:var(--mono);
+  }
+  .field input:focus, .field select:focus{ outline:none; border-color: var(--violet); }
+  .modal-actions{ display:flex; gap:10px; margin-top:6px; }
+  .btn{
+    flex:1; padding:10px; border-radius:8px; cursor:pointer; font-size:13px; letter-spacing:0.03em;
+    border:1px solid var(--panel-border); background:transparent; color:var(--text-dim);
+  }
+  .btn.primary{ background: linear-gradient(135deg, var(--violet), var(--magenta)); color:#fff; border:none; }
+  .btn:hover{ filter:brightness(1.15); }
+  .connmsg{ font-size:11.5px; margin-top:10px; color:var(--text-dim); min-height:14px; font-family:var(--mono); }
+
+  @media (max-width:600px){
+    .halo{ width:150px; height:150px; }
+    .orb{ width:58px; height:58px; }
+    .deity-name{ font-size:26px; }
+    .msg .bubble{ max-width:88%; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .nebula, .orb, .ring1, .ring2, .ring3, .pulse-dot, #bootOrb{ animation:none !important; }
+    .flash{ display:none; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="stars"></canvas>
+<div class="nebula"></div>
+<div class="vignette"></div>
+
+<div id="boot">
+  <div id="bootOrb"></div>
+  <div id="bootText">despertando núcleo…</div>
+</div>
+
+<div class="app" id="app" hidden>
+
+  <div class="hud-top">
+    <div class="hud-pill"><span class="pulse-dot" id="statusDot"></span> <b id="statusText">ONLINE</b> · <span id="modelLabel">—</span></div>
+    <button id="settingsBtn" aria-label="Configurações">⚙</button>
+  </div>
+
+  <div class="core-zone">
+    <div class="halo" id="halo">
+      <svg class="rings" viewBox="0 0 200 200">
+        <circle class="ring ring1" cx="100" cy="100" r="92"></circle>
+        <circle class="ring ring2" cx="100" cy="100" r="78"></circle>
+        <circle class="ring ring3" cx="100" cy="100" r="66"></circle>
+      </svg>
+      <div class="orb" id="orb"></div>
+      <div class="orbit-particles" id="orbitParticles"></div>
+    </div>
+    <h1 class="deity-name">ORÁCULO</h1>
+    <p class="deity-sub">uma inteligência que vive na sua máquina</p>
+  </div>
+
+  <div class="chat-zone" id="log"></div>
+
+  <form class="inputbar" id="inputForm">
+    <input id="inputField" autocomplete="off" placeholder="Pergunte ao Oráculo…" />
+    <button type="submit" id="sendBtn" aria-label="Enviar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+    </button>
+  </form>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>Conexão com o núcleo</h2>
+    <div class="field">
+      <label for="cfgEndpoint">Endpoint do servidor local</label>
+      <input id="cfgEndpoint" value="http://localhost:11434" spellcheck="false">
+    </div>
+    <div class="field">
+      <label for="cfgModel">Nome do modelo</label>
+      <input id="cfgModel" value="llama3.2" spellcheck="false">
+    </div>
+    <div class="field">
+      <label for="cfgFormat">Formato da API</label>
+      <select id="cfgFormat">
+        <option value="ollama">Ollama</option>
+        <option value="openai">Compatível com OpenAI</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="cfgKey">Chave de API (opcional)</label>
+      <input id="cfgKey" placeholder="deixe em branco se não usar" spellcheck="false">
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="testConn">Testar conexão</button>
+      <button type="button" class="btn primary" id="closeModal">Fechar</button>
+    </div>
+    <div class="connmsg" id="connMsg"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ============== STARFIELD ============== */
+  const canvas = document.getElementById("stars");
+  const ctx = canvas.getContext("2d");
+  let stars = [];
+  function resize(){
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const count = Math.min(140, Math.floor((canvas.width*canvas.height)/9000));
+    stars = Array.from({length:count}, ()=>({
+      x: Math.random()*canvas.width,
+      y: Math.random()*canvas.height,
+      r: Math.random()*1.4 + 0.2,
+      s: Math.random()*0.02 + 0.005,
+      phase: Math.random()*Math.PI*2,
+      drift: (Math.random()-0.5)*0.05
+    }));
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  function drawStars(t){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    stars.forEach(st=>{
+      const alpha = 0.35 + Math.sin(t*st.s + st.phase)*0.35;
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(220,210,255,${Math.max(0,alpha)})`;
+      ctx.arc(st.x, st.y, st.r, 0, Math.PI*2);
+      ctx.fill();
+      st.y += st.drift;
+      if(st.y > canvas.height) st.y = 0;
+      if(st.y < 0) st.y = canvas.height;
+    });
+    if(!reduceMotion) requestAnimationFrame(drawStars);
+  }
+  requestAnimationFrame(drawStars);
+  if(reduceMotion) drawStars(0);
+
+  /* ============== ORBIT PARTICLES ============== */
+  const orbitHost = document.getElementById("orbitParticles");
+  const orbitCount = 8;
+  const orbitDots = [];
+  for(let i=0;i<orbitCount;i++){
+    const dot = document.createElement("i");
+    orbitHost.appendChild(dot);
+    orbitDots.push({
+      el: dot,
+      angle: (Math.PI*2/orbitCount)*i,
+      radius: 60 + Math.random()*30,
+      speed: 0.004 + Math.random()*0.004
+    });
+  }
+  let thinking = false;
+  function animateOrbit(){
+    orbitDots.forEach(d=>{
+      d.angle += d.speed * (thinking ? 3.2 : 1);
+      const x = Math.cos(d.angle)*d.radius;
+      const y = Math.sin(d.angle)*d.radius*0.55;
+      d.el.style.transform = `translate(${x}px, ${y}px)`;
+      d.el.style.opacity = thinking ? 0.95 : 0.5;
+    });
+    if(!reduceMotion) requestAnimationFrame(animateOrbit);
+  }
+  if(!reduceMotion) requestAnimationFrame(animateOrbit);
+
+  /* ============== PARALLAX ============== */
+  const halo = document.getElementById("halo");
+  if(!reduceMotion){
+    document.addEventListener("mousemove", (e)=>{
+      const dx = (e.clientX / window.innerWidth - 0.5) * 14;
+      const dy = (e.clientY / window.innerHeight - 0.5) * 14;
+      halo.style.transform = `translate(${dx}px, ${dy}px)`;
+    });
+  }
+
+  /* ============== BOOT SEQUENCE ============== */
+  const bootTextEl = document.getElementById("bootText");
+  const bootEl = document.getElementById("boot");
+  const appEl = document.getElementById("app");
+  const bootSteps = ["despertando núcleo…", "alinhando constelações de dados…", "consciência sincronizada."];
+
+  function runBoot(){
+    if(reduceMotion){ finishBoot(); return; }
+    let i = 0;
+    const iv = setInterval(()=>{
+      i++;
+      if(i >= bootSteps.length){ clearInterval(iv); setTimeout(finishBoot, 500); return; }
+      bootTextEl.textContent = bootSteps[i];
+    }, 750);
+  }
+  function finishBoot(){
+    bootEl.style.transition = "opacity .5s ease";
+    bootEl.style.opacity = "0";
+    setTimeout(()=>{
+      bootEl.remove();
+      appEl.hidden = false;
+      flash();
+    }, 500);
+  }
+  runBoot();
+
+  function flash(){
+    if(reduceMotion) return;
+    const f = document.createElement("div");
+    f.className = "flash";
+    document.body.appendChild(f);
+    setTimeout(()=>f.remove(), 900);
+  }
+
+  /* ============== SETTINGS MODAL ============== */
+  const modalOverlay = document.getElementById("modalOverlay");
+  document.getElementById("settingsBtn").addEventListener("click", ()=> modalOverlay.classList.add("show"));
+  document.getElementById("closeModal").addEventListener("click", ()=> modalOverlay.classList.remove("show"));
+  modalOverlay.addEventListener("click", (e)=>{ if(e.target === modalOverlay) modalOverlay.classList.remove("show"); });
+
+  /* ============== CHAT LOGIC ============== */
+  const log = document.getElementById("log");
+  const statusDot = document.getElementById("statusDot");
+  const statusText = document.getElementById("statusText");
+  const modelLabel = document.getElementById("modelLabel");
+  const cfgEndpoint = document.getElementById("cfgEndpoint");
+  const cfgModel = document.getElementById("cfgModel");
+  const cfgFormat = document.getElementById("cfgFormat");
+  const cfgKey = document.getElementById("cfgKey");
+  const connMsg = document.getElementById("connMsg");
+  const haloEl = document.getElementById("halo");
+
+  let history = [];
+  modelLabel.textContent = cfgModel.value;
+  cfgModel.addEventListener("input", ()=> modelLabel.textContent = cfgModel.value || "—");
+
+  function addMessage(role, text, {typewriter=false} = {}){
+    const row = document.createElement("div");
+    row.className = "msg " + role;
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    row.appendChild(bubble);
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
+
+    if(typewriter && !reduceMotion){
+      let i = 0;
+      const caret = document.createElement("span");
+      caret.className = "caret";
+      const iv = setInterval(()=>{
+        bubble.textContent = text.slice(0, i);
+        bubble.appendChild(caret);
+        i++;
+        log.scrollTop = log.scrollHeight;
+        if(i > text.length){ clearInterval(iv); caret.remove(); }
+      }, 14);
+    } else {
+      bubble.textContent = text;
+    }
+    return bubble;
+  }
+
+  addMessage("system", "O Oráculo despertou. Abra as configurações (⚙) para conectar ao seu modelo local.");
+
+  async function callOllama(base, model, messages, key){
+    const headers = {"Content-Type":"application/json"};
+    if(key) headers["Authorization"] = "Bearer " + key;
+    const res = await fetch(base.replace(/\/$/,"") + "/api/chat", {
+      method:"POST", headers, body: JSON.stringify({ model, messages, stream:false })
+    });
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    return (data.message && data.message.content) || data.response || "";
+  }
+  async function callOpenAICompat(base, model, messages, key){
+    const headers = {"Content-Type":"application/json"};
+    if(key) headers["Authorization"] = "Bearer " + key;
+    const res = await fetch(base.replace(/\/$/,"") + "/v1/chat/completions", {
+      method:"POST", headers, body: JSON.stringify({ model, messages })
+    });
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
+  }
+  async function askLocalAI(messages){
+    const base = cfgEndpoint.value.trim();
+    const model = cfgModel.value.trim();
+    const key = cfgKey.value.trim();
+    return cfgFormat.value === "ollama"
+      ? callOllama(base, model, messages, key)
+      : callOpenAICompat(base, model, messages, key);
+  }
+  function setOnline(isOnline){
+    statusDot.classList.toggle("offline", !isOnline);
+    statusText.textContent = isOnline ? "ONLINE" : "OFFLINE";
+  }
+
+  document.getElementById("testConn").addEventListener("click", async ()=>{
+    connMsg.textContent = "Testando…";
+    try{
+      await askLocalAI([{role:"user", content:"ping"}]);
+      setOnline(true);
+      connMsg.textContent = "Conectado com sucesso.";
+    }catch(err){
+      setOnline(false);
+      connMsg.textContent = "Falha na conexão: " + err.message;
+    }
+  });
+
+  const form = document.getElementById("inputForm");
+  const inputField = document.getElementById("inputField");
+  const sendBtn = document.getElementById("sendBtn");
+
+  form.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const text = inputField.value.trim();
+    if(!text) return;
+    inputField.value = "";
+    sendBtn.disabled = true;
+    thinking = true;
+    haloEl.classList.add("active");
+
+    addMessage("user", text);
+    history.push({role:"user", content:text});
+
+    const pending = addMessage("assistant", "…");
+
+    try{
+      const reply = await askLocalAI(history);
+      setOnline(true);
+      pending.parentElement.remove();
+      addMessage("assistant", reply || "(resposta vazia)", {typewriter:true});
+      history.push({role:"assistant", content: reply || ""});
+    }catch(err){
+      setOnline(false);
+      pending.parentElement.remove();
+      addMessage("system", "Conexão com " + cfgEndpoint.value + " falhou (" + err.message + "). Verifique se o servidor local está ativo. Exibindo resposta simulada:");
+      addMessage("assistant", "Isto é uma simulação — a conexão real com o modelo falhou. Configure o endpoint correto em ⚙ para respostas reais.", {typewriter:true});
+    }finally{
+      thinking = false;
+      haloEl.classList.remove("active");
+      sendBtn.disabled = false;
+      inputField.focus();
+      if(!reduceMotion) flash();
+    }
+  });
+
+})();
+</script>
+
+</body>
+</html>
