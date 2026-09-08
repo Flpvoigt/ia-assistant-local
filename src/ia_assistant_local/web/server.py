@@ -16,7 +16,8 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 
 from ..ai.agent import LocalAgent
-from ..core.config import Settings
+from ..core.actions import command_preview, execute_command, search_folder_context, validate_folder
+from ..core.config import PROJECT_ROOT, Settings
 from ..core.memory import PERMISSION_LABELS, MemoryStore
 from ..integrations.home_assistant import HomeAssistantClient
 from ..integrations.tools import ToolRegistry
@@ -220,6 +221,46 @@ class AssistantHandler(BaseHTTPRequestHandler):
             except PermissionError as exc:
                 self._send_json(401, {"error": str(exc)})
             return
+        if path == "/api/memory-timeline":
+            try:
+                user = self._require_user()
+                self._require_permission(user, "memory_access")
+                self._send_json(200, {"events": self.server.memory.memory_timeline(user["id"])})
+            except PermissionError as exc:
+                self._send_json(403, {"error": str(exc)})
+            return
+        if path == "/api/projects":
+            try:
+                user = self._require_user()
+                self._require_permission(user, "project_access")
+                self._send_json(200, {"projects": self.server.memory.list_projects(user["id"])})
+            except PermissionError as exc:
+                self._send_json(403, {"error": str(exc)})
+            return
+        project_match = re.fullmatch(r"/api/projects/(\d+)", path)
+        if project_match:
+            try:
+                user = self._require_user()
+                self._require_permission(user, "project_access")
+                project = self.server.memory.project(user["id"], int(project_match.group(1)))
+                self._send_json(200, {"project": project})
+            except PermissionError as exc:
+                self._send_json(403, {"error": str(exc)})
+            return
+        if path == "/api/approvals":
+            try:
+                user = self._require_user()
+                self._send_json(200, {"approvals": self.server.memory.list_approvals(user["id"])})
+            except PermissionError as exc:
+                self._send_json(401, {"error": str(exc)})
+            return
+        if path == "/api/workflows":
+            try:
+                user = self._require_user()
+                self._send_json(200, {"workflows": self.server.memory.list_workflows(user["id"])})
+            except PermissionError as exc:
+                self._send_json(401, {"error": str(exc)})
+            return
         if path == "/api/chats":
             try:
                 user = self._require_user()
@@ -355,6 +396,76 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 created = self.server.memory.add_memory(user["id"], str(payload.get("content", "")))
                 self._send_json(201 if created else 200, {"created": created})
                 return
+            if self.path == "/api/projects":
+                user = self._require_user()
+                self._require_permission(user, "project_access")
+                payload = self._read_json()
+                project = self.server.memory.create_project(
+                    user["id"],
+                    str(payload.get("name", "")),
+                    str(payload.get("instructions", "")),
+                )
+                self._send_json(201, {"project": project})
+                return
+            folder_match = re.fullmatch(r"/api/projects/(\d+)/folders", self.path)
+            if folder_match:
+                user = self._require_user()
+                self._require_permission(user, "project_access")
+                payload = self._read_json()
+                folder = validate_folder(str(payload.get("path", "")))
+                created = self.server.memory.add_project_folder(
+                    user["id"], int(folder_match.group(1)), str(folder)
+                )
+                self._send_json(201, {"folder": created})
+                return
+            search_match = re.fullmatch(r"/api/projects/(\d+)/search", self.path)
+            if search_match:
+                user = self._require_user()
+                self._require_permission(user, "project_access")
+                payload = self._read_json()
+                project = self.server.memory.project(user["id"], int(search_match.group(1)))
+                results = search_folder_context(
+                    [folder["path"] for folder in project["folders"]],
+                    str(payload.get("query", "")),
+                )
+                self._send_json(200, {"results": results, "sent_to_ai": False})
+                return
+            clone_match = re.fullmatch(r"/api/chats/(\d+)/clone", self.path)
+            if clone_match:
+                user = self._require_user()
+                chat = self.server.memory.clone_chat(user["id"], int(clone_match.group(1)))
+                self._send_json(201, {"chat": chat})
+                return
+            if self.path == "/api/terminal/preview":
+                user = self._require_user()
+                self._require_permission(user, "terminal_access")
+                payload = self._read_json()
+                action = str(payload.get("action", ""))
+                preview = command_preview(action)
+                project_id = payload.get("project_id")
+                working_directory = str(PROJECT_ROOT)
+                if project_id is not None:
+                    project = self.server.memory.project(user["id"], int(project_id))
+                    if project["folders"]:
+                        working_directory = project["folders"][0]["path"]
+                approval = self.server.memory.create_approval(
+                    user["id"],
+                    "terminal",
+                    {**preview, "working_directory": working_directory},
+                )
+                self._send_json(201, {"approval": approval})
+                return
+            if self.path == "/api/workflows":
+                user = self._require_user()
+                payload = self._read_json()
+                steps = payload.get("steps", [])
+                if not isinstance(steps, list):
+                    raise TypeError("Etapas inválidas.")
+                workflow = self.server.memory.create_workflow(
+                    user["id"], str(payload.get("name", "")), steps
+                )
+                self._send_json(201, {"workflow": workflow})
+                return
             if self.path == "/api/chat":
                 self._handle_chat()
                 return
@@ -380,6 +491,68 @@ class AssistantHandler(BaseHTTPRequestHandler):
                     raise ValueError("Modelo não permitido.")
                 self.server.memory.set_model_preference(user["id"], model, effort)
                 self._send_json(200, {"model": model, "effort": effort})
+                return
+            project_match = re.fullmatch(r"/api/projects/(\d+)", self.path)
+            if project_match:
+                user = self._require_user()
+                self._require_permission(user, "project_access")
+                payload = self._read_json()
+                project = self.server.memory.update_project(
+                    user["id"],
+                    int(project_match.group(1)),
+                    str(payload.get("name", "")),
+                    str(payload.get("instructions", "")),
+                )
+                self._send_json(200, {"project": project})
+                return
+            approval_match = re.fullmatch(r"/api/approvals/(\d+)", self.path)
+            if approval_match:
+                user = self._require_user()
+                payload = self._read_json()
+                approval_id = int(approval_match.group(1))
+                decision = str(payload.get("decision", ""))
+                approval = self.server.memory.approval(user["id"], approval_id)
+                if decision == "deny":
+                    resolved = self.server.memory.resolve_approval(
+                        user["id"], approval_id, "denied"
+                    )
+                elif decision == "approve":
+                    if approval["kind"] == "terminal":
+                        self._require_permission(user, "terminal_access")
+                        result = execute_command(
+                            approval["payload"]["action"],
+                            approval["payload"]["working_directory"],
+                        )
+                    elif approval["kind"] == "assistant_tool":
+                        tool_name = str(approval["payload"].get("name", ""))
+                        permission = TOOL_PERMISSIONS.get(tool_name)
+                        if permission is None:
+                            raise ValueError("Ferramenta de aprovação desconhecida.")
+                        self._require_permission(user, permission)
+                        arguments = approval["payload"].get("arguments", {})
+                        if not isinstance(arguments, dict):
+                            raise TypeError("Argumentos da ferramenta inválidos.")
+                        tools = getattr(self.server.agent, "tools", None)
+                        if tools is None:
+                            raise RuntimeError("Ferramentas indisponíveis.")
+                        output = tools.execute(
+                            tool_name,
+                            arguments,
+                            lambda _request: True,
+                            allowed=frozenset({tool_name}),
+                        )
+                        result = {"ok": True, "output": output}
+                    else:
+                        raise ValueError("Tipo de aprovação desconhecido.")
+                    resolved = self.server.memory.resolve_approval(
+                        user["id"],
+                        approval_id,
+                        "approved" if result["ok"] else "failed",
+                        result,
+                    )
+                else:
+                    raise ValueError("Decisão inválida.")
+                self._send_json(200, {"approval": resolved})
                 return
             match = re.fullmatch(r"/api/admin/users/(\d+)/permissions", self.path)
             if match is None:
@@ -416,6 +589,10 @@ class AssistantHandler(BaseHTTPRequestHandler):
         if model not in self._available_models():
             model = self.server.settings.groq_model
         reasoning_effort = self.server.memory.reasoning_effort(user["id"])
+        raw_project_id = payload.get("project_id")
+        project_id = (
+            int(raw_project_id) if raw_project_id not in {None, ""} and mode == "private" else None
+        )
         raw_chat_id = payload.get("chat_id")
         if mode == "temporary":
             chat_id = None
@@ -445,7 +622,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 for item in rows
             ]
         elif raw_chat_id is None:
-            chat_id = self.server.memory.create_chat(user["id"], message)
+            chat_id = self.server.memory.create_chat(user["id"], message, project_id)
             history = []
         else:
             chat_id = int(raw_chat_id)
@@ -456,6 +633,16 @@ class AssistantHandler(BaseHTTPRequestHandler):
         permissions = self.server.memory.permissions_for_user(user["id"])
         memory_enabled = permissions["memory_access"] and mode == "private"
         memory_rows = self.server.memory.list_memories(user["id"]) if memory_enabled else []
+        approved_context: list[str] = []
+        raw_context = payload.get("approved_context", [])
+        if payload.get("context_consent") is True and isinstance(raw_context, list):
+            for item in raw_context[:3]:
+                if not isinstance(item, dict):
+                    continue
+                source = " ".join(str(item.get("source", "Contexto")).split())[:160]
+                content = str(item.get("content", "")).strip()[:4000]
+                if content:
+                    approved_context.append(f"Contexto autorizado ({source}):\n{content}")
         explicit = EXPLICIT_MEMORY.match(message) if memory_enabled else None
         if explicit:
             self.server.memory.add_memory(user["id"], explicit.group(1))
@@ -469,19 +656,39 @@ class AssistantHandler(BaseHTTPRequestHandler):
             )
             ask_kwargs = {
                 "history": history,
-                "memories": [f"[{item['category']}] {item['content']}" for item in memory_rows],
+                "memories": [
+                    *[f"[{item['category']}] {item['content']}" for item in memory_rows],
+                    *approved_context,
+                ],
                 "allowed_tools": allowed_tools,
             }
-            if "model" in inspect.signature(self.server.agent.ask).parameters:
-                ask_kwargs["model"] = model
+
+            def request_approval(request: dict) -> bool:
+                if not isinstance(request, dict):
+                    return False
+                tool_name = str(request.get("name", ""))
+                if tool_name not in allowed_tools:
+                    return False
+                arguments = request.get("arguments", {})
+                if not isinstance(arguments, dict):
+                    return False
+                self.server.memory.create_approval(
+                    user["id"],
+                    "assistant_tool",
+                    {
+                        "name": tool_name,
+                        "label": str(request.get("description", tool_name))[:200],
+                        "arguments": arguments,
+                    },
+                )
+                return False
+
+            ask_kwargs["confirm"] = request_approval
             if "reasoning_effort" in inspect.signature(self.server.agent.ask).parameters:
                 ask_kwargs["reasoning_effort"] = reasoning_effort
-            try:
-                reply = self.server.agent.ask(message, lambda _: False, **ask_kwargs)
-                self.server.memory.record_usage(user["id"], model, True)
-            except (httpx.HTTPError, RuntimeError, TypeError, ValueError):
-                self.server.memory.record_usage(user["id"], model, False)
-                raise
+            reply, used_model, fallback_used = self._ask_with_fallback(
+                user["id"], message, model, ask_kwargs
+            )
         if mode != "temporary":
             self.server.memory.add_message(user["id"], chat_id, "user", message)
             self.server.memory.add_message(user["id"], chat_id, "assistant", reply)
@@ -507,9 +714,33 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 "chat_title": title,
                 "memory_saved": bool(explicit),
                 "mode": mode,
-                "model": model,
+                "model": used_model if not blocked_internal_request else model,
+                "fallback_used": fallback_used if not blocked_internal_request else False,
             },
         )
+
+    def _ask_with_fallback(
+        self, user_id: int, message: str, primary_model: str, ask_kwargs: dict
+    ) -> tuple[str, str, bool]:
+        models = [primary_model]
+        models.extend(model for model in self._available_models() if model != primary_model)
+        last_error: Exception | None = None
+        supports_model = "model" in inspect.signature(self.server.agent.ask).parameters
+        for candidate in models[:2]:
+            candidate_kwargs = dict(ask_kwargs)
+            if supports_model:
+                candidate_kwargs["model"] = candidate
+            try:
+                confirm = candidate_kwargs.pop("confirm", lambda _request: False)
+                reply = self.server.agent.ask(message, confirm, **candidate_kwargs)
+                self.server.memory.record_usage(user_id, candidate, True)
+                return reply, candidate, candidate != primary_model
+            except (httpx.HTTPError, RuntimeError, TypeError, ValueError) as exc:
+                self.server.memory.record_usage(user_id, candidate, False)
+                last_error = exc
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("Nenhum modelo disponível.")
 
     def _available_models(self) -> tuple[str, ...]:
         configured = getattr(self.server.settings, "groq_models", ())
@@ -552,6 +783,17 @@ class AssistantHandler(BaseHTTPRequestHandler):
             elif self.path.startswith("/api/chats/"):
                 chat_id = int(self.path.removeprefix("/api/chats/"))
                 deleted = self.server.memory.delete_chat(user["id"], chat_id)
+            elif self.path.startswith("/api/project-folders/"):
+                self._require_permission(user, "project_access")
+                folder_id = int(self.path.removeprefix("/api/project-folders/"))
+                deleted = self.server.memory.remove_project_folder(user["id"], folder_id)
+            elif self.path.startswith("/api/projects/"):
+                self._require_permission(user, "project_access")
+                project_id = int(self.path.removeprefix("/api/projects/"))
+                deleted = self.server.memory.delete_project(user["id"], project_id)
+            elif self.path.startswith("/api/workflows/"):
+                workflow_id = int(self.path.removeprefix("/api/workflows/"))
+                deleted = self.server.memory.delete_workflow(user["id"], workflow_id)
             else:
                 self._send_json(404, {"error": "Rota não encontrada."})
                 return

@@ -30,11 +30,21 @@ def test_tool_denied_by_user_permission_is_not_executed():
 def test_action_is_not_executed_without_confirmation():
     registry = ToolRegistry(Mock())
     with patch("subprocess.Popen") as process:
+        requests = []
         result = registry.execute(
-            "open_application", {"application": "calculadora"}, lambda _: False
+            "open_application",
+            {"application": "calculadora"},
+            lambda request: requests.append(request) or False,
         )
     process.assert_not_called()
-    assert result["status"] == "cancelado pelo usuario"
+    assert result["status"] == "aguardando aprovacao do usuario"
+    assert requests == [
+        {
+            "name": "open_application",
+            "arguments": {"application": "calculadora"},
+            "description": "Abre calculadora ou bloco_de_notas.",
+        }
+    ]
 
 
 def test_unlisted_application_is_denied():

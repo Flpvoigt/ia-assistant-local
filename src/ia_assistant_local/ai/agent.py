@@ -91,7 +91,7 @@ class LocalAgent:
     def ask(
         self,
         text: str,
-        confirm: Callable[[str], bool],
+        confirm: Callable[[dict], bool],
         history: list[dict[str, str]] | None = None,
         memories: list[str] | None = None,
         allowed_tools: frozenset[str] | None = None,

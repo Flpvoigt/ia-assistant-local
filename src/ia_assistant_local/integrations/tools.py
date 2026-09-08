@@ -116,7 +116,7 @@ class ToolRegistry:
         self,
         name: str,
         arguments: dict,
-        confirm: Callable[[str], bool],
+        confirm: Callable[[dict[str, Any]], bool],
         allowed: frozenset[str] | None = None,
     ) -> Any:
         if allowed is not None and name not in allowed:
@@ -124,6 +124,8 @@ class ToolRegistry:
         tool = self.tools.get(name)
         if tool is None:
             raise PermissionError(f"Ferramenta desconhecida: {name}")
-        if tool.confirmation_required and not confirm(f"Executar {name} com {arguments}?"):
-            return {"status": "cancelado pelo usuario"}
+        if tool.confirmation_required and not confirm(
+            {"name": name, "arguments": arguments, "description": tool.description}
+        ):
+            return {"status": "aguardando aprovacao do usuario"}
         return tool.handler(**arguments)

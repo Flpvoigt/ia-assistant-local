@@ -157,3 +157,50 @@ def test_shared_room_model_preference_search_and_health(tmp_path):
     health = store.health_summary()
     assert health["requests_24h"] == 1
     assert health["errors_24h"] == 0
+
+
+def test_memory_timeline_projects_branch_approvals_and_workflows(tmp_path):
+    store = MemoryStore(tmp_path / "oraculo.db")
+    credentials = dict(store.bootstrap_admins())
+    _, will = store.login("will", credentials["will"])
+    user_id = will["id"]
+
+    store.upsert_memory(user_id, "project", "project.oracle", "Versão inicial")
+    store.upsert_memory(user_id, "project", "project.oracle", "Versão corrigida")
+    store.delete_memory_by_key(user_id, "project.oracle")
+    assert [event["action"] for event in store.memory_timeline(user_id)[:3]] == [
+        "forgotten",
+        "updated",
+        "learned",
+    ]
+
+    project = store.create_project(user_id, "Oráculo", "Responder com segurança")
+    folder = store.add_project_folder(user_id, project["id"], str(tmp_path))
+    assert store.project(user_id, project["id"])["folders"] == [folder]
+    chat_id = store.create_chat(user_id, "Teste do projeto", project["id"])
+    store.add_message(user_id, chat_id, "user", "Mensagem original")
+    branch = store.clone_chat(user_id, chat_id)
+    assert branch["parent_chat_id"] == chat_id
+    assert branch["project_id"] == project["id"]
+    assert store.chat_messages(user_id, branch["id"])[0]["content"] == "Mensagem original"
+
+    approval = store.create_approval(user_id, "terminal", {"action": "git_status"})
+    assert approval["status"] == "pending"
+    assert store.resolve_approval(user_id, approval["id"], "denied")["status"] == "denied"
+    workflow = store.create_workflow(user_id, "Revisão", ["Ler arquivos", "Criar resumo"])
+    assert store.workflow(user_id, workflow["id"])["steps"] == [
+        "Ler arquivos",
+        "Criar resumo",
+    ]
+
+
+def test_projects_are_isolated_between_users(tmp_path):
+    store = MemoryStore(tmp_path / "oraculo.db")
+    credentials = dict(store.bootstrap_admins())
+    _, will = store.login("will", credentials["will"])
+    _, gustavo = store.login("gustavo", credentials["gustavo"])
+    project = store.create_project(will["id"], "Privado")
+
+    assert store.list_projects(gustavo["id"]) == []
+    with pytest.raises(PermissionError, match="não encontrado"):
+        store.project(gustavo["id"], project["id"])

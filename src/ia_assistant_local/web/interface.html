@@ -167,6 +167,8 @@
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     padding: 8px 0 4px;
     flex-shrink:0;
+    max-height:340px; overflow:hidden;
+    transition:max-height .42s ease,padding .42s ease,opacity .3s ease;
   }
   .halo{
     position:relative; width:200px; height:200px;
@@ -281,7 +283,18 @@
   }
 
   /* ================= CHAT ================= */
-  .chat-zone{ min-height:0; overflow-y:auto; padding: 10px 4px 6px; display:flex; flex-direction:column; gap:14px; }
+  .app.chat-active .core-zone{ max-height:94px; padding:2px 0 7px; }
+  .app.chat-active .halo{ width:54px; height:54px; }
+  .app.chat-active .orb{ width:25px; height:25px; }
+  .app.chat-active .deity-name{ margin:2px 0 0; font-size:15px; }
+  .app.chat-active .deity-sub{ display:none; }
+  .app.chat-active .mode-notice{ min-height:0; margin-top:2px; padding:2px 8px; font-size:8px; }
+  .chat-zone{
+    min-height:0; overflow-y:auto; padding:22px 4px 10px; display:flex;
+    flex-direction:column; gap:14px; scroll-behavior:smooth;
+    -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18px,#000 100%);
+    mask-image:linear-gradient(to bottom,transparent 0,#000 18px,#000 100%);
+  }
   .chat-zone::-webkit-scrollbar{ width:6px; }
   .chat-zone::-webkit-scrollbar-thumb{ background: rgba(139,47,255,0.35); border-radius:4px; }
 
@@ -341,6 +354,23 @@
   #sendBtn:hover{ transform: scale(1.08); }
   #sendBtn:disabled{ opacity:0.4; cursor:not-allowed; transform:none; }
   #sendBtn svg{ width:17px; height:17px; }
+  .response-stage,.queue-state{
+    min-height:16px; margin:0 14px 4px; color:var(--text-faint);
+    font:9px var(--mono); letter-spacing:.05em;
+  }
+  .response-stage.active{ color:var(--cyan); }
+  .response-stage.active::before{ content:""; display:inline-block; width:5px; height:5px;
+    margin-right:7px; border-radius:50%; background:var(--cyan); box-shadow:0 0 7px var(--cyan); }
+  .queue-state{ float:right; margin-top:-20px; text-align:right; color:var(--gold); }
+  .context-actions{ display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+  .context-actions .btn{ font-size:10px; padding:8px; }
+  .context-select{ width:100%; padding:8px; border-radius:8px; color:var(--text);
+    background:rgba(0,0,0,.3); border:1px solid var(--panel-border); }
+  .context-chips{ display:flex; flex-direction:column; gap:6px; }
+  .context-chip{ display:flex; gap:6px; align-items:center; padding:7px; border-radius:7px;
+    border:1px solid rgba(41,230,255,.2); color:var(--text-dim); font-size:9px; }
+  .context-chip span{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .context-chip button{ border:0; color:#ff7890; background:transparent; cursor:pointer; }
 
   /* ================= FLASH PULSE ================= */
   .flash{
@@ -461,6 +491,8 @@
   }
   .chat-link:hover,.chat-link.active{ background:var(--panel); border-color:var(--panel-border); color:#fff; }
   .chat-delete{ border:0; background:transparent; color:#ff7890; cursor:pointer; padding:5px; }
+  .chat-reference{ border:0; background:transparent; color:var(--cyan); cursor:pointer; padding:5px; }
+  .chat-project{ display:block; color:var(--text-faint); font-size:8px; margin-top:2px; }
   .sidebar-note{
     font-size:9.5px; line-height:1.35; color:var(--text-faint);
     padding:5px 9px 2px;
@@ -557,6 +589,24 @@
     background:#05020d; border:1px solid var(--panel-border); border-radius:9px;
     font-family:var(--mono); font-size:12px; line-height:1.5;
   }
+  .workspace-grid{ display:grid; grid-template-columns:minmax(170px,.75fr) minmax(260px,1.4fr); gap:14px; }
+  .workspace-list{ display:flex; flex-direction:column; gap:6px; max-height:52vh; overflow:auto; }
+  .workspace-card{ padding:10px; border:1px solid var(--panel-border); border-radius:9px;
+    background:rgba(255,255,255,.025); }
+  .workspace-card strong{ display:block; font-size:12px; margin-bottom:5px; }
+  .workspace-card small{ color:var(--text-faint); }
+  .workspace-card pre{ max-height:180px; overflow:auto; white-space:pre-wrap; color:var(--text-dim);
+    font:10px/1.45 var(--mono); }
+  .workspace-actions{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .workspace-actions .btn{ padding:7px 9px; font-size:10px; }
+  .workspace-form input,.workspace-form textarea,.workspace-form select{
+    width:100%; margin:5px 0; padding:9px; color:var(--text); background:rgba(0,0,0,.3);
+    border:1px solid var(--panel-border); border-radius:8px; font-family:var(--font);
+  }
+  .workspace-form textarea{ min-height:74px; resize:vertical; }
+  .timeline{ display:flex; flex-direction:column; gap:6px; max-height:180px; overflow:auto; }
+  .timeline-item{ padding:7px 8px; border-left:2px solid var(--violet); color:var(--text-dim); font-size:10px; }
+  .timeline-item small{ display:block; color:var(--text-faint); margin-bottom:2px; }
 
   @media (max-width:900px){
     body.context-open .app{ margin-right:0; }
@@ -570,6 +620,7 @@
     .orb{ width:58px; height:58px; }
     .deity-name{ font-size:26px; }
     .msg .bubble{ max-width:88%; }
+    .workspace-grid{ grid-template-columns:1fr; }
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -620,7 +671,10 @@
   <div class="sidebar-tools">
     <button type="button" class="btn" id="searchBtn">⌕ Pesquisar</button>
     <button type="button" class="btn" id="healthBtn">♡ Sistema</button>
+    <button type="button" class="btn" id="projectsBtn">▤ Projetos</button>
+    <button type="button" class="btn" id="approvalsBtn">✓ Aprovações</button>
   </div>
+  <button type="button" class="btn" id="workflowsBtn">⇢ Fluxos personalizados</button>
   <div class="chat-list" id="chatList"></div>
   <button type="button" class="btn" id="adminPanelBtn" hidden>Painel do dev-chefe</button>
   <div class="sidebar-note">
@@ -648,6 +702,18 @@
   <div class="context-card">
     <div class="context-label">Modelo</div>
     <div class="context-value" id="contextModel">Oráculo 1.0</div>
+  </div>
+  <div class="context-card" id="contextProjectCard">
+    <div class="context-label">Projeto</div>
+    <select class="context-select" id="projectSelect"><option value="">Sem projeto</option></select>
+    <div class="context-actions" style="margin-top:8px">
+      <button type="button" class="btn" id="attachProjectInstructions">Usar instruções</button>
+      <button type="button" class="btn" id="branchChatBtn">Ramificar chat</button>
+    </div>
+  </div>
+  <div class="context-card" id="approvedContextCard" hidden>
+    <div class="context-label">Contextos aprovados para o próximo envio</div>
+    <div class="context-chips" id="approvedContexts"></div>
   </div>
   <div class="context-card" id="contextMemoryCard">
     <div class="context-label">Memória pessoal</div>
@@ -689,6 +755,8 @@
   <div class="chat-zone" id="log"></div>
 
   <div class="composer" id="composer">
+    <div class="response-stage" id="responseStage"></div>
+    <div class="queue-state" id="queueState"></div>
     <div class="model-menu-wrap">
       <button class="model-trigger" id="modelTrigger" type="button" aria-expanded="false">
         <span class="bolt">ϟ</span><strong id="selectedModelName">Selecionar modelo</strong>
@@ -763,11 +831,55 @@
       qualquer memória.
     </p>
     <div class="memory-list" id="memoryList"></div>
+    <h2 style="margin-top:22px">Linha do tempo da memória</h2>
+    <div class="timeline" id="memoryTimeline"></div>
     <div class="modal-actions">
       <button type="button" class="btn" id="testConn">Atualizar estado</button>
       <button type="button" class="btn primary" id="closeModal">Fechar</button>
     </div>
     <div class="connmsg" id="connMsg"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="projectsOverlay">
+  <div class="modal" style="width:min(900px,96vw)">
+    <h2>Conhecimento por projeto</h2>
+    <div class="workspace-grid">
+      <div>
+        <form class="workspace-form" id="newProjectForm">
+          <input id="newProjectName" placeholder="Nome do projeto" required maxlength="80">
+          <textarea id="newProjectInstructions" placeholder="Instruções próprias do projeto"></textarea>
+          <button class="btn primary" type="submit">Criar projeto</button>
+        </form>
+        <div class="workspace-list" id="projectList" style="margin-top:12px"></div>
+      </div>
+      <div id="projectDetail"><div class="workspace-card">Selecione ou crie um projeto.</div></div>
+    </div>
+    <div class="connmsg" id="projectMessage"></div>
+    <div class="modal-actions"><button type="button" class="btn primary" id="closeProjects">Fechar</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="approvalsOverlay">
+  <div class="modal" style="width:min(760px,95vw)">
+    <h2>Central de aprovações</h2>
+    <p style="color:var(--text-dim);font-size:12px">Nenhum comando é executado sem aparecer aqui com a prévia exata.</p>
+    <div class="workspace-list" id="approvalList"></div>
+    <div class="modal-actions"><button type="button" class="btn primary" id="closeApprovals">Fechar</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="workflowsOverlay">
+  <div class="modal" style="width:min(700px,95vw)">
+    <h2>Fluxos personalizados</h2>
+    <form class="workspace-form" id="workflowForm">
+      <input id="workflowName" placeholder="Nome do fluxo" required maxlength="80">
+      <textarea id="workflowSteps" placeholder="Uma solicitação por linha" required></textarea>
+      <button class="btn primary" type="submit">Salvar fluxo</button>
+    </form>
+    <div class="workspace-list" id="workflowList" style="margin-top:12px"></div>
+    <div class="connmsg" id="workflowMessage"></div>
+    <div class="modal-actions"><button type="button" class="btn primary" id="closeWorkflows">Fechar</button></div>
   </div>
 </div>
 
@@ -964,6 +1076,14 @@
   const healthGrid = document.getElementById("healthGrid");
   const artifactOverlay = document.getElementById("artifactOverlay");
   const artifactBody = document.getElementById("artifactBody");
+  const projectsOverlay = document.getElementById("projectsOverlay");
+  const approvalsOverlay = document.getElementById("approvalsOverlay");
+  const workflowsOverlay = document.getElementById("workflowsOverlay");
+  const projectSelect = document.getElementById("projectSelect");
+  const approvedContextCard = document.getElementById("approvedContextCard");
+  const approvedContexts = document.getElementById("approvedContexts");
+  const responseStage = document.getElementById("responseStage");
+  const queueState = document.getElementById("queueState");
   let currentChatId = null;
   let currentAccount = null;
   let currentPermissions = {};
@@ -973,6 +1093,47 @@
   let availableModels = [];
   let currentModel = "";
   let currentEffort = "medium";
+  let currentProjectId = null;
+  let availableProjects = [];
+  let pendingContexts = [];
+  let messageQueue = [];
+  let processingQueue = false;
+  let typewriterJobs = 0;
+
+  function updateConversationLayout(){
+    const hasConversation = Boolean(log.querySelector(".msg.user,.msg.assistant"));
+    appEl.classList.toggle("chat-active", hasConversation);
+  }
+
+  function scrollLog(){
+    window.requestAnimationFrame(()=>log.scrollTo({top:log.scrollHeight, behavior:"smooth"}));
+  }
+
+  function setStage(label=""){
+    responseStage.textContent = label;
+    responseStage.classList.toggle("active", Boolean(label));
+  }
+
+  function updateQueueState(){
+    queueState.textContent = messageQueue.length ? messageQueue.length + " na fila" : "";
+  }
+
+  function draftKey(){
+    const user = currentAccount ? currentAccount.username : "anon";
+    return ["oraculo:draft", user, currentMode, currentChatId || "novo", currentProjectId || "sem-projeto"].join(":");
+  }
+
+  function saveDraft(){
+    if(!currentAccount) return;
+    const value = inputField.value;
+    if(value) localStorage.setItem(draftKey(), value);
+    else localStorage.removeItem(draftKey());
+  }
+
+  function restoreDraft(){
+    if(!currentAccount) return;
+    inputField.value = localStorage.getItem(draftKey()) || "";
+  }
 
   function applyModeTheme(mode){
     document.body.classList.toggle("mode-temporary", mode === "temporary");
@@ -1053,21 +1214,30 @@
       bubble.appendChild(name);
     }
     row.appendChild(bubble);
+    bubble.typingDone = Promise.resolve();
     log.appendChild(row);
-    log.scrollTop = log.scrollHeight;
+    updateConversationLayout();
+    scrollLog();
 
     if(typewriter && !reduceMotion){
       let i = 0;
+      typewriterJobs++;
+      const chunk = Math.max(1, Math.ceil(text.length / 900));
       const contentNode = document.createTextNode("");
       const caret = document.createElement("span");
       caret.className = "caret";
       bubble.append(contentNode, caret);
-      const iv = setInterval(()=>{
+      bubble.typingDone = new Promise(resolve=>{
+        const iv = setInterval(()=>{
         contentNode.nodeValue = text.slice(0, i);
-        i++;
-        log.scrollTop = log.scrollHeight;
-        if(i > text.length){ clearInterval(iv); caret.remove(); attachArtifacts(row, text); }
-      }, 14);
+        i += chunk;
+        if(i % 8 === 0) scrollLog();
+        if(i > text.length){
+          clearInterval(iv); caret.remove(); attachArtifacts(row, text); typewriterJobs--;
+          scrollLog(); resolve();
+        }
+        }, 9);
+      });
     } else {
       bubble.appendChild(document.createTextNode(text));
       attachArtifacts(row, text);
@@ -1086,10 +1256,15 @@
 
   async function askAI(message){
     const history = currentMode === "temporary" ? temporaryHistory : undefined;
+    const contexts = pendingContexts.slice(0, 3).map(item=>({source:item.source, content:item.content}));
     return api("/api/chat", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({message, chat_id:currentChatId, mode:currentMode, history})
+      body:JSON.stringify({
+        message, chat_id:currentChatId, mode:currentMode, history,
+        project_id:currentProjectId, approved_context:contexts,
+        context_consent:contexts.length > 0
+      })
     });
   }
 
@@ -1192,6 +1367,7 @@
   refreshStatus();
 
   function startNewChat(){
+    saveDraft();
     currentChatId = null;
     currentMode = "private";
     temporaryHistory = [];
@@ -1199,28 +1375,39 @@
     contextChatTitle.textContent = "Nova conversa";
     log.innerHTML = "";
     addMessage("system", "Nova conversa. Suas memórias pessoais continuam disponíveis.");
+    pendingContexts = [];
+    renderApprovedContexts();
+    restoreDraft();
     document.querySelectorAll(".chat-link").forEach(item=>item.classList.remove("active"));
     if(window.innerWidth <= 600) document.body.classList.remove("sidebar-open");
     inputField.focus();
   }
 
   function startTemporaryChat(){
+    saveDraft();
     currentChatId = null;
+    currentProjectId = null;
     currentMode = "temporary";
     temporaryHistory = [];
     applyModeTheme("temporary");
     contextChatTitle.textContent = "Chat temporário";
     log.innerHTML = "";
     addMessage("system", "Este chat não será salvo e não usará nem criará memórias.");
+    pendingContexts = [];
+    renderApprovedContexts();
+    renderProjectSelect();
+    restoreDraft();
     document.querySelectorAll(".chat-link").forEach(item=>item.classList.remove("active"));
     if(window.innerWidth <= 600) document.body.classList.remove("sidebar-open");
     inputField.focus();
   }
 
   async function openSharedChat(){
+    saveDraft();
     const data = await api("/api/shared");
     currentChatId = data.chat.id;
     currentMode = "shared";
+    currentProjectId = null;
     temporaryHistory = [];
     applyModeTheme("shared");
     contextChatTitle.textContent = data.chat.title;
@@ -1229,18 +1416,28 @@
     data.messages.forEach(item=>addMessage(item.role, item.content, {
       sender:item.role === "user" ? item.display_name : "Oráculo"
     }));
+    pendingContexts = [];
+    renderApprovedContexts();
+    renderProjectSelect();
+    restoreDraft();
     document.querySelectorAll(".chat-link").forEach(item=>item.classList.remove("active"));
     if(window.innerWidth <= 600) document.body.classList.remove("sidebar-open");
   }
 
-  async function openChat(chatId, chatTitle){
+  async function openChat(chatId, chatTitle, projectId=null){
+    saveDraft();
     const data = await api("/api/chats/" + chatId);
     currentChatId = chatId;
     currentMode = "private";
+    currentProjectId = projectId;
     applyModeTheme("private");
     contextChatTitle.textContent = chatTitle || "Conversa";
     log.innerHTML = "";
     data.messages.forEach(item=>addMessage(item.role, item.content));
+    pendingContexts = [];
+    renderApprovedContexts();
+    renderProjectSelect();
+    restoreDraft();
     document.querySelectorAll(".chat-link").forEach(item=>{
       item.classList.toggle("active", Number(item.dataset.id) === chatId);
     });
@@ -1257,10 +1454,24 @@
       open.type = "button";
       open.className = "chat-link";
       open.dataset.id = chat.id;
-      open.textContent = chat.title;
+      const title = document.createElement("span");
+      title.textContent = chat.title;
+      open.appendChild(title);
+      if(chat.project_name){
+        const project = document.createElement("small");
+        project.className = "chat-project";
+        project.textContent = chat.project_name;
+        open.appendChild(project);
+      }
       open.title = chat.title;
       open.classList.toggle("active", chat.id === currentChatId);
-      open.addEventListener("click", ()=>openChat(chat.id, chat.title));
+      open.addEventListener("click", ()=>openChat(chat.id, chat.title, chat.project_id));
+      const reference = document.createElement("button");
+      reference.type = "button";
+      reference.className = "chat-reference";
+      reference.textContent = "@";
+      reference.title = "Selecionar trecho para referenciar";
+      reference.addEventListener("click", ()=>referenceChat(chat.id, chat.title).catch(err=>addMessage("system",err.message)));
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "chat-delete";
@@ -1272,13 +1483,15 @@
         if(currentChatId === chat.id) startNewChat();
         await loadChats();
       });
-      row.append(open, remove);
+      row.append(open, reference, remove);
       chatList.appendChild(row);
     });
   }
 
   async function loadMemories(){
-    const data = await api("/api/memories");
+    const [data, timelineData] = await Promise.all([
+      api("/api/memories"), api("/api/memory-timeline")
+    ]);
     const categoryLabels = {
       personal:"Pessoal",
       preference:"Preferência",
@@ -1286,6 +1499,21 @@
       goal:"Objetivo"
     };
     memoryList.innerHTML = "";
+    const timeline = document.getElementById("memoryTimeline");
+    timeline.innerHTML = "";
+    const actionLabels = {learned:"Aprendida", updated:"Corrigida", forgotten:"Esquecida"};
+    if(!timelineData.events.length) timeline.textContent = "Ainda não há eventos.";
+    timelineData.events.forEach(item=>{
+      const row = document.createElement("div");
+      row.className = "timeline-item";
+      const meta = document.createElement("small");
+      meta.textContent = (actionLabels[item.action] || item.action) + " · " +
+        new Date(item.created_at * 1000).toLocaleString("pt-BR");
+      const text = document.createElement("span");
+      text.textContent = item.content;
+      row.append(meta, text);
+      timeline.appendChild(row);
+    });
     contextMemories.innerHTML = "";
     contextMemoryCount.textContent = data.memories.length;
     if(!data.memories.length){
@@ -1324,6 +1552,297 @@
     });
   }
 
+  function renderApprovedContexts(){
+    approvedContexts.innerHTML = "";
+    approvedContextCard.hidden = pendingContexts.length === 0;
+    pendingContexts.forEach((item,index)=>{
+      const chip = document.createElement("div");
+      chip.className = "context-chip";
+      const name = document.createElement("span");
+      name.textContent = item.source;
+      name.title = item.source;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.textContent = "×";
+      remove.title = "Não enviar este contexto";
+      remove.addEventListener("click", ()=>{
+        pendingContexts.splice(index,1);
+        renderApprovedContexts();
+      });
+      chip.append(name, remove);
+      approvedContexts.appendChild(chip);
+    });
+  }
+
+  function addApprovedContext(source, content){
+    pendingContexts.push({source:String(source).slice(0,160), content:String(content).slice(0,4000)});
+    pendingContexts = pendingContexts.slice(-3);
+    renderApprovedContexts();
+    document.body.classList.add("context-open");
+  }
+
+  async function referenceChat(chatId, title){
+    const data = await api("/api/chats/" + chatId);
+    const content = data.messages.slice(-8).map(item=>
+      (item.role === "user" ? "Usuário: " : "Oráculo: ") + item.content
+    ).join("\n\n");
+    if(!content) return;
+    const selected = window.prompt(
+      "Revise e recorte abaixo exatamente o trecho que poderá ser enviado ao Groq. Cancele para não anexar:",
+      content.slice(0,4000)
+    );
+    if(selected === null || !selected.trim()) return;
+    if(!window.confirm("Confirmar o envio do trecho revisado ao Groq apenas no próximo pedido?")) return;
+    addApprovedContext("Conversa: " + title, selected.trim());
+    inputField.value = "@" + title + " " + inputField.value;
+    saveDraft();
+  }
+
+  function renderProjectSelect(){
+    projectSelect.innerHTML = "";
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = "Sem projeto";
+    projectSelect.appendChild(empty);
+    availableProjects.forEach(project=>{
+      const option = document.createElement("option");
+      option.value = project.id;
+      option.textContent = project.name;
+      projectSelect.appendChild(option);
+    });
+    projectSelect.value = currentProjectId === null ? "" : String(currentProjectId);
+  }
+
+  async function loadProjects(){
+    if(!currentPermissions.project_access) return;
+    const data = await api("/api/projects");
+    availableProjects = data.projects;
+    if(currentProjectId !== null && !availableProjects.some(item=>item.id === currentProjectId)){
+      currentProjectId = null;
+    }
+    renderProjectSelect();
+    renderProjectList();
+  }
+
+  function renderProjectList(){
+    const list = document.getElementById("projectList");
+    list.innerHTML = "";
+    if(!availableProjects.length) list.textContent = "Nenhum projeto criado.";
+    availableProjects.forEach(project=>{
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "btn result-item";
+      const label = document.createElement("strong");
+      label.textContent = project.name;
+      const detail = document.createElement("small");
+      detail.textContent = project.folder_count + " pasta(s) · " + project.chat_count + " conversa(s)";
+      button.append(label, detail);
+      button.addEventListener("click", ()=>openProject(project.id));
+      list.appendChild(button);
+    });
+  }
+
+  function projectAction(label, handler, primary=false){
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn" + (primary ? " primary" : "");
+    button.textContent = label;
+    button.addEventListener("click", handler);
+    return button;
+  }
+
+  async function openProject(projectId){
+    const data = await api("/api/projects/" + projectId);
+    const project = data.project;
+    currentProjectId = project.id;
+    renderProjectSelect();
+    const detail = document.getElementById("projectDetail");
+    detail.innerHTML = "";
+    const form = document.createElement("form");
+    form.className = "workspace-form workspace-card";
+    const name = document.createElement("input");
+    name.value = project.name;
+    const instructions = document.createElement("textarea");
+    instructions.value = project.instructions;
+    instructions.placeholder = "Instruções do projeto";
+    const save = projectAction("Salvar projeto", ()=>{}, true);
+    save.type = "submit";
+    const attach = projectAction("Anexar instruções ao próximo envio", ()=>{
+      if(!project.instructions) return;
+      if(window.confirm("Enviar ao Groq as instruções visíveis deste projeto apenas no próximo pedido?")){
+        addApprovedContext("Instruções do projeto " + project.name, project.instructions);
+      }
+    });
+    form.addEventListener("submit", async event=>{
+      event.preventDefault();
+      await api("/api/projects/" + project.id, {
+        method:"PUT", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({name:name.value, instructions:instructions.value})
+      });
+      document.getElementById("projectMessage").textContent = "Projeto atualizado.";
+      await loadProjects();
+      await openProject(project.id);
+    });
+    form.append(name, instructions, save, attach);
+
+    const folders = document.createElement("div");
+    folders.className = "workspace-card";
+    const folderTitle = document.createElement("strong");
+    folderTitle.textContent = "Pastas locais autorizadas (somente leitura)";
+    folders.appendChild(folderTitle);
+    project.folders.forEach(folder=>{
+      const row = document.createElement("div");
+      row.className = "workspace-actions";
+      const path = document.createElement("small");
+      path.textContent = folder.path;
+      const remove = projectAction("Remover", async ()=>{
+        await api("/api/project-folders/" + folder.id, {method:"DELETE"});
+        await openProject(project.id); await loadProjects();
+      });
+      row.append(path, remove); folders.appendChild(row);
+    });
+    const folderForm = document.createElement("form");
+    folderForm.className = "workspace-form";
+    const folderInput = document.createElement("input");
+    folderInput.placeholder = "C:\\caminho\\da\\pasta";
+    const folderButton = projectAction("Autorizar pasta", ()=>{});
+    folderButton.type = "submit";
+    folderForm.append(folderInput, folderButton);
+    folderForm.addEventListener("submit", async event=>{
+      event.preventDefault();
+      await api("/api/projects/" + project.id + "/folders", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({path:folderInput.value})
+      });
+      await openProject(project.id); await loadProjects();
+    });
+    folders.appendChild(folderForm);
+
+    const search = document.createElement("div");
+    search.className = "workspace-card";
+    const searchTitle = document.createElement("strong");
+    searchTitle.textContent = "Pesquisar nas pastas";
+    const searchForm = document.createElement("form");
+    searchForm.className = "workspace-form";
+    const query = document.createElement("input");
+    query.placeholder = "Termo no código ou documento";
+    const searchButton = projectAction("Pesquisar localmente", ()=>{});
+    searchButton.type = "submit";
+    const results = document.createElement("div");
+    results.className = "workspace-list";
+    searchForm.append(query, searchButton);
+    searchForm.addEventListener("submit", async event=>{
+      event.preventDefault(); results.textContent = "Pesquisando…";
+      const response = await api("/api/projects/" + project.id + "/search", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({query:query.value})
+      });
+      results.innerHTML = "";
+      if(!response.results.length) results.textContent = "Nada encontrado.";
+      response.results.forEach(item=>{
+        const card = document.createElement("div"); card.className = "workspace-card";
+        const path = document.createElement("strong"); path.textContent = item.path;
+        const preview = document.createElement("pre"); preview.textContent = item.content;
+        const attachResult = projectAction("Anexar ao próximo envio", ()=>{
+          if(window.confirm("Enviar ao Groq exatamente este trecho de ‘" + item.path + "’ no próximo pedido?")){
+            addApprovedContext(item.path, item.content);
+          }
+        }, true);
+        card.append(path, preview, attachResult); results.appendChild(card);
+      });
+    });
+    search.append(searchTitle, searchForm, results);
+
+    const terminal = document.createElement("div");
+    terminal.className = "workspace-card";
+    if(currentPermissions.terminal_access){
+      const terminalTitle = document.createElement("strong"); terminalTitle.textContent = "Terminal controlado";
+      const select = document.createElement("select");
+      select.innerHTML = "<option value=\"git_status\">Git status</option><option value=\"git_diff\">Resumo das alterações</option><option value=\"git_log\">Últimos commits</option><option value=\"list_files\">Listar arquivos</option><option value=\"tests\">Executar testes</option><option value=\"lint\">Verificar código</option><option value=\"python_version\">Versão do Python</option>";
+      const preview = projectAction("Criar pedido de aprovação", async ()=>{
+        await api("/api/terminal/preview", {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({action:select.value, project_id:project.id})
+        });
+        projectsOverlay.classList.remove("show");
+        approvalsOverlay.classList.add("show");
+        await loadApprovals();
+      }, true);
+      terminal.append(terminalTitle, select, preview);
+    }else{
+      terminal.textContent = "Terminal controlado não permitido neste perfil.";
+    }
+    const danger = projectAction("Excluir projeto", async ()=>{
+      if(!window.confirm("Excluir o projeto? As conversas serão preservadas sem vínculo.")) return;
+      await api("/api/projects/" + project.id, {method:"DELETE"});
+      currentProjectId = null; document.getElementById("projectDetail").innerHTML = "";
+      await loadProjects();
+    });
+    detail.append(form, folders, search, terminal, danger);
+  }
+
+  async function loadApprovals(){
+    const data = await api("/api/approvals");
+    const list = document.getElementById("approvalList");
+    list.innerHTML = "";
+    if(!data.approvals.length) list.textContent = "Nenhuma ação registrada.";
+    data.approvals.forEach(item=>{
+      const card = document.createElement("div"); card.className = "workspace-card";
+      const title = document.createElement("strong");
+      title.textContent = (item.payload.label || item.kind) + " · " + item.status;
+      const command = document.createElement("pre");
+      const preview = item.payload.command || JSON.stringify(item.payload.arguments || {}, null, 2);
+      command.textContent = preview + (item.payload.working_directory
+        ? "\nPasta: " + item.payload.working_directory : "");
+      card.append(title, command);
+      if(item.status === "pending"){
+        const actions = document.createElement("div"); actions.className = "workspace-actions";
+        const resolve = async decision=>{
+          await api("/api/approvals/" + item.id, {
+            method:"PUT", headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({decision})
+          });
+          await loadApprovals();
+        };
+        actions.append(
+          projectAction("Negar", ()=>resolve("deny")),
+          projectAction("Aprovar e executar", ()=>resolve("approve"), true)
+        );
+        card.appendChild(actions);
+      }
+      if(item.result){
+        const result = document.createElement("pre");
+        const output = item.result.output || item.result.error || item.result;
+        result.textContent = typeof output === "string" ? output : JSON.stringify(output,null,2);
+        card.appendChild(result);
+      }
+      list.appendChild(card);
+    });
+  }
+
+  async function loadWorkflows(){
+    const data = await api("/api/workflows");
+    const list = document.getElementById("workflowList");
+    list.innerHTML = "";
+    if(!data.workflows.length) list.textContent = "Nenhum fluxo salvo.";
+    data.workflows.forEach(item=>{
+      const card = document.createElement("div"); card.className = "workspace-card";
+      const title = document.createElement("strong"); title.textContent = item.name;
+      const steps = document.createElement("small"); steps.textContent = item.steps.join(" → ");
+      const actions = document.createElement("div"); actions.className = "workspace-actions";
+      actions.append(
+        projectAction("Executar na fila", ()=>{
+          item.steps.forEach(step=>enqueueMessage(step));
+          workflowsOverlay.classList.remove("show");
+        }, true),
+        projectAction("Excluir", async ()=>{
+          await api("/api/workflows/" + item.id, {method:"DELETE"}); await loadWorkflows();
+        })
+      );
+      card.append(title, steps, actions); list.appendChild(card);
+    });
+  }
+
   function applyPermissions(permissions){
     currentPermissions = permissions;
     const memoryAllowed = Boolean(permissions.memory_access);
@@ -1333,6 +1852,8 @@
     contextMemoryCard.hidden = !memoryAllowed;
     contextButton.hidden = !contextAllowed;
     contextSidebar.hidden = !contextAllowed;
+    document.getElementById("projectsBtn").hidden = !permissions.project_access;
+    document.getElementById("contextProjectCard").hidden = !permissions.project_access;
     if(!contextAllowed) document.body.classList.remove("context-open");
   }
 
@@ -1355,6 +1876,7 @@
     changePasswordForm.hidden = true;
     startNewChat();
     const loaders = [loadChats(), loadModels(), refreshStatus()];
+    if(currentPermissions.project_access) loaders.push(loadProjects());
     if(currentPermissions.memory_access) loaders.push(loadMemories());
     await Promise.all(loaders);
   }
@@ -1460,6 +1982,79 @@
     document.body.classList.remove("context-open");
   });
   contextSettingsButton.addEventListener("click", openSettings);
+  projectSelect.addEventListener("change", ()=>{
+    saveDraft();
+    currentProjectId = projectSelect.value ? Number(projectSelect.value) : null;
+    restoreDraft();
+  });
+  document.getElementById("attachProjectInstructions").addEventListener("click", ()=>{
+    const project = availableProjects.find(item=>item.id === currentProjectId);
+    if(!project || !project.instructions) return addMessage("system", "Este projeto não possui instruções.");
+    const selected = window.prompt(
+      "Revise exatamente as instruções que poderão ser enviadas ao Groq no próximo pedido:",
+      project.instructions.slice(0,4000)
+    );
+    if(selected === null || !selected.trim()) return;
+    if(window.confirm("Confirmar o envio do texto revisado ao Groq apenas no próximo pedido?")){
+      addApprovedContext("Instruções do projeto " + project.name, selected.trim());
+    }
+  });
+  document.getElementById("branchChatBtn").addEventListener("click", async ()=>{
+    if(!currentChatId || currentMode !== "private"){
+      addMessage("system", "Abra uma conversa pessoal salva para criar uma ramificação."); return;
+    }
+    const data = await api("/api/chats/" + currentChatId + "/clone", {method:"POST"});
+    await loadChats();
+    await openChat(data.chat.id, data.chat.title, data.chat.project_id);
+    addMessage("system", "Ramificação criada. A conversa original foi preservada.");
+  });
+
+  document.getElementById("projectsBtn").addEventListener("click", async ()=>{
+    projectsOverlay.classList.add("show"); await loadProjects();
+  });
+  document.getElementById("closeProjects").addEventListener("click", ()=>projectsOverlay.classList.remove("show"));
+  projectsOverlay.addEventListener("click", event=>{ if(event.target === projectsOverlay) projectsOverlay.classList.remove("show"); });
+  document.getElementById("newProjectForm").addEventListener("submit", async event=>{
+    event.preventDefault();
+    const message = document.getElementById("projectMessage");
+    try{
+      const data = await api("/api/projects", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          name:document.getElementById("newProjectName").value,
+          instructions:document.getElementById("newProjectInstructions").value
+        })
+      });
+      event.target.reset(); message.textContent = "Projeto criado.";
+      await loadProjects(); await openProject(data.project.id);
+    }catch(err){ message.textContent = err.message; }
+  });
+
+  document.getElementById("approvalsBtn").addEventListener("click", async ()=>{
+    approvalsOverlay.classList.add("show"); await loadApprovals();
+  });
+  document.getElementById("closeApprovals").addEventListener("click", ()=>approvalsOverlay.classList.remove("show"));
+  approvalsOverlay.addEventListener("click", event=>{ if(event.target === approvalsOverlay) approvalsOverlay.classList.remove("show"); });
+
+  document.getElementById("workflowsBtn").addEventListener("click", async ()=>{
+    workflowsOverlay.classList.add("show"); await loadWorkflows();
+  });
+  document.getElementById("closeWorkflows").addEventListener("click", ()=>workflowsOverlay.classList.remove("show"));
+  workflowsOverlay.addEventListener("click", event=>{ if(event.target === workflowsOverlay) workflowsOverlay.classList.remove("show"); });
+  document.getElementById("workflowForm").addEventListener("submit", async event=>{
+    event.preventDefault();
+    const message = document.getElementById("workflowMessage");
+    try{
+      await api("/api/workflows", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          name:document.getElementById("workflowName").value,
+          steps:document.getElementById("workflowSteps").value.split("\n").map(item=>item.trim()).filter(Boolean)
+        })
+      });
+      event.target.reset(); message.textContent = "Fluxo salvo."; await loadWorkflows();
+    }catch(err){ message.textContent = err.message; }
+  });
 
   async function runSearch(query){
     searchResults.textContent = "Pesquisando…";
@@ -1692,15 +2287,22 @@
   const form = document.getElementById("inputForm");
   const inputField = document.getElementById("inputField");
   const sendBtn = document.getElementById("sendBtn");
+  inputField.addEventListener("input", saveDraft);
 
-  form.addEventListener("submit", async (e)=>{
-    e.preventDefault();
-    const text = inputField.value.trim();
-    if(!text) return;
-    inputField.value = "";
-    sendBtn.disabled = true;
+  function enqueueMessage(text){
+    const clean = String(text || "").trim();
+    if(!clean) return;
+    messageQueue.push(clean);
+    updateQueueState();
+    processQueue();
+  }
+
+  async function sendOneMessage(text){
     thinking = true;
     haloEl.classList.add("active");
+    setStage("Analisando a solicitação…");
+    const stageContext = window.setTimeout(()=>setStage("Preparando contexto autorizado…"), 550);
+    const stageModel = window.setTimeout(()=>setStage("Consultando o modelo…"), 1200);
 
     addMessage("user", text, {
       sender:currentMode === "shared" && currentAccount ? currentAccount.display_name : ""
@@ -1715,10 +2317,14 @@
       contextChatTitle.textContent = data.chat_title || contextChatTitle.textContent;
       setOnline(true);
       pending.parentElement.remove();
-      addMessage("assistant", reply || "(resposta vazia)", {
+      setStage("Escrevendo a resposta…");
+      const rendered = addMessage("assistant", reply || "(resposta vazia)", {
         typewriter:true,
         sender:currentMode === "shared" ? "Oráculo" : ""
       });
+      await rendered.typingDone;
+      pendingContexts = [];
+      renderApprovedContexts();
       if(currentMode === "temporary"){
         temporaryHistory.push(
           {role:"user", content:text},
@@ -1726,6 +2332,9 @@
         );
       }else if(currentMode === "private"){
         await loadChats();
+      }
+      if(data.fallback_used){
+        addMessage("system", "O modelo principal falhou; o Oráculo continuou automaticamente com " + data.model + ".");
       }
       if(data.memory_saved){
         addMessage("system", "Informação salva na sua memória pessoal.");
@@ -1738,12 +2347,36 @@
       pending.parentElement.remove();
       addMessage("system", "Não foi possível obter resposta: " + err.message);
     }finally{
+      window.clearTimeout(stageContext);
+      window.clearTimeout(stageModel);
       thinking = false;
       haloEl.classList.remove("active");
-      sendBtn.disabled = false;
+      setStage("Concluído");
+      window.setTimeout(()=>{ if(!thinking) setStage(""); }, 900);
       inputField.focus();
       if(!reduceMotion) flash();
     }
+  }
+
+  async function processQueue(){
+    if(processingQueue) return;
+    processingQueue = true;
+    while(messageQueue.length){
+      const next = messageQueue.shift();
+      updateQueueState();
+      await sendOneMessage(next);
+    }
+    processingQueue = false;
+    updateQueueState();
+  }
+
+  form.addEventListener("submit", e=>{
+    e.preventDefault();
+    const text = inputField.value.trim();
+    if(!text) return;
+    inputField.value = "";
+    saveDraft();
+    enqueueMessage(text);
   });
 
 })();

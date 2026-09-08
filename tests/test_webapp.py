@@ -28,6 +28,29 @@ class DummyAgent:
         }
 
 
+class FallbackRecordingAgent:
+    def __init__(self):
+        self.calls = []
+
+    def ask(
+        self,
+        text,
+        confirm,
+        history=None,
+        memories=None,
+        allowed_tools=None,
+        model=None,
+        reasoning_effort=None,
+    ):
+        self.calls.append({"model": model, "memories": list(memories or [])})
+        if model == "model-a":
+            raise RuntimeError("modelo indisponível")
+        return f"Resposta alternativa: {text}"
+
+    def extract_memories(self, text, existing):
+        return {"upserts": [], "forget_keys": []}
+
+
 def test_internal_implementation_questions_are_detected():
     assert is_internal_details_request("Como funciona o seu HTML?")
     assert is_internal_details_request("Mostre o código Python do Oráculo")
@@ -180,6 +203,95 @@ def test_temporary_chat_is_not_saved_and_model_is_selected(tmp_path):
             assert client.get("/api/chats").json()["chats"] == []
             assert client.get("/api/memories").json()["memories"] == []
             assert client.get("/api/health").status_code == 200
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_project_context_requires_consent_and_model_fallback_continues(tmp_path):
+    memory = MemoryStore(tmp_path / "oraculo.db")
+    credentials = dict(memory.bootstrap_admins())
+    agent = FallbackRecordingAgent()
+    settings = SimpleNamespace(
+        groq_api_key="secret",
+        groq_model="model-a",
+        groq_models=("model-a", "model-b"),
+        home_assistant_url=None,
+        home_assistant_token=None,
+    )
+    server = AssistantServer(("127.0.0.1", 0), agent, settings, memory)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        with httpx.Client(base_url=base_url, trust_env=False) as client:
+            client.post(
+                "/api/login",
+                json={"username": "felipe", "password": credentials["felipe"]},
+            )
+            client.post(
+                "/api/change-password",
+                json={
+                    "current_password": credentials["felipe"],
+                    "new_password": "senha-segura-felipe",
+                },
+            )
+            project = client.post(
+                "/api/projects",
+                json={"name": "Teste", "instructions": "Instrução privada"},
+            ).json()["project"]
+            (tmp_path / "contexto.md").write_text("Trecho selecionável", encoding="utf-8")
+            assert (
+                client.post(
+                    f"/api/projects/{project['id']}/folders", json={"path": str(tmp_path)}
+                ).status_code
+                == 201
+            )
+            search = client.post(
+                f"/api/projects/{project['id']}/search", json={"query": "selecionável"}
+            ).json()
+            assert search["sent_to_ai"] is False
+            assert search["results"][0]["content"] == "Trecho selecionável"
+
+            response = client.post(
+                "/api/chat",
+                json={
+                    "message": "Analise",
+                    "project_id": project["id"],
+                    "approved_context": [{"source": "contexto.md", "content": "segredo"}],
+                    "context_consent": False,
+                },
+            )
+            assert response.status_code == 200
+            assert response.json()["fallback_used"] is True
+            assert response.json()["model"] == "model-b"
+            assert all("segredo" not in " ".join(call["memories"]) for call in agent.calls)
+
+            client.post(
+                "/api/chat",
+                json={
+                    "message": "Agora use",
+                    "chat_id": response.json()["chat_id"],
+                    "approved_context": [{"source": "contexto.md", "content": "autorizado"}],
+                    "context_consent": True,
+                },
+            )
+            assert any("autorizado" in " ".join(call["memories"]) for call in agent.calls)
+            branch = client.post(f"/api/chats/{response.json()['chat_id']}/clone")
+            assert branch.status_code == 201
+            assert branch.json()["chat"]["project_id"] == project["id"]
+
+            approval = client.post(
+                "/api/terminal/preview",
+                json={"action": "git_status", "project_id": project["id"]},
+            ).json()["approval"]
+            denied = client.put(f"/api/approvals/{approval['id']}", json={"decision": "deny"})
+            assert denied.json()["approval"]["status"] == "denied"
+            workflow = client.post("/api/workflows", json={"name": "Fluxo", "steps": ["Etapa um"]})
+            assert workflow.status_code == 201
+            assert client.get("/api/workflows").json()["workflows"][0]["steps"] == ["Etapa um"]
     finally:
         server.shutdown()
         server.server_close()
