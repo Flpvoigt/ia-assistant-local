@@ -16,7 +16,16 @@ class DummyAgent:
         return f"Resposta para: {text}"
 
     def extract_memories(self, text, existing):
-        return ["Memória automática de teste"]
+        return {
+            "upserts": [
+                {
+                    "category": "project",
+                    "key": "project.test_project",
+                    "content": "Memória automática de teste",
+                }
+            ],
+            "forget_keys": [],
+        }
 
 
 def test_internal_implementation_questions_are_detected():
@@ -124,6 +133,53 @@ def test_internal_details_are_blocked_before_reaching_the_agent(tmp_path):
             )
             assert response.status_code == 200
             assert response.json()["reply"] == CONFIDENTIALITY_REPLY
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_temporary_chat_is_not_saved_and_model_is_selected(tmp_path):
+    memory = MemoryStore(tmp_path / "oraculo.db")
+    credentials = dict(memory.bootstrap_admins())
+    settings = SimpleNamespace(
+        groq_api_key="secret",
+        groq_model="model-a",
+        groq_models=("model-a", "model-b"),
+        home_assistant_url=None,
+        home_assistant_token=None,
+    )
+    server = AssistantServer(("127.0.0.1", 0), DummyAgent(), settings, memory)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        with httpx.Client(base_url=base_url, trust_env=False) as client:
+            client.post(
+                "/api/login",
+                json={"username": "will", "password": credentials["will"]},
+            )
+            client.post(
+                "/api/change-password",
+                json={
+                    "current_password": credentials["will"],
+                    "new_password": "senha-segura-will",
+                },
+            )
+            selected = client.put("/api/model", json={"model": "model-b", "effort": "high"})
+            assert selected.status_code == 200
+            assert selected.json()["effort"] == "high"
+            response = client.post(
+                "/api/chat",
+                json={"message": "Não salve", "mode": "temporary", "history": []},
+            )
+            assert response.status_code == 200
+            assert response.json()["chat_id"] is None
+            assert response.json()["model"] == "model-b"
+            assert client.get("/api/chats").json()["chats"] == []
+            assert client.get("/api/memories").json()["memories"] == []
+            assert client.get("/api/health").status_code == 200
     finally:
         server.shutdown()
         server.server_close()

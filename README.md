@@ -71,10 +71,21 @@ O historico e as memorias ficam separados por conta no banco local
 nova e limpa; conversas anteriores aparecem na barra lateral e podem ser reabertas
 ou excluidas.
 
+A interface possui seletor de modelo salvo por usuario, chat temporario que nao
+grava historico nem memorias, uma sala compartilhada entre os tres criadores,
+pesquisa global, painel de saude do sistema e paineis de artefatos para blocos de
+codigo, tabelas e checklists. A lista permitida de modelos pode ser ajustada em
+`GROQ_MODELS`; somente modelos incluidos nela sao aceitos pelo servidor.
+
 Depois de cada mensagem, o Oraculo identifica automaticamente fatos e preferencias
 duradouras que possam ajudar no futuro. Pedidos momentaneos e informacoes sensiveis,
 como senhas, tokens, documentos e dados financeiros, nao devem virar memoria.
 Memorias automaticas podem ser revisadas e excluidas nas configuracoes.
+
+As memorias sao organizadas como informacoes pessoais, preferencias, projetos e
+objetivos. Cada fato recebe uma chave estavel: quando o usuario corrige uma
+informacao, a versao anterior e atualizada em vez de gerar uma duplicata. Pedidos
+explicitos para esquecer um fato removem a memoria correspondente.
 
 A conta `felipe` tem o papel `owner` e exibe um painel exclusivo para auditar as
 conversas de `will` e `gustavo` durante validacoes e diagnosticos. Essa permissao

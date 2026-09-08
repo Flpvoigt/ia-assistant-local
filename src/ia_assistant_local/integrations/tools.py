@@ -109,9 +109,7 @@ class ToolRegistry:
 
     def schemas(self, allowed: frozenset[str] | None = None) -> list[dict[str, Any]]:
         return [
-            tool.schema()
-            for tool in self.tools.values()
-            if allowed is None or tool.name in allowed
+            tool.schema() for tool in self.tools.values() if allowed is None or tool.name in allowed
         ]
 
     def execute(

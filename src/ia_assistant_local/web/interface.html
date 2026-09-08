@@ -25,6 +25,10 @@
   [hidden]{ display:none !important; }
   html,body{ height:100%; margin:0; background:var(--void); overflow:hidden; }
   body{ font-family:var(--font); color:var(--text); }
+  body,.app,.orb,.ring,.deity-name,.deity-sub,.inputbar,.hud-pill{
+    transition:background .35s ease,border-color .35s ease,box-shadow .35s ease,
+      color .35s ease,filter .35s ease,opacity .35s ease,transform .35s ease;
+  }
   ::selection{ background: rgba(139,47,255,0.4); color:#fff; }
 
   canvas#stars{ position:fixed; inset:0; z-index:0; }
@@ -84,6 +88,52 @@
     display:flex; align-items:center; justify-content:space-between;
   }
   .hud-actions{ display:flex; align-items:center; gap:9px; }
+  .composer{ position:relative; margin-top:8px; }
+  .model-menu-wrap{ position:relative; width:max-content; margin:0 0 7px 8px; }
+  .model-trigger{
+    height:32px; max-width:240px; display:flex; align-items:center; gap:7px;
+    padding:0 12px; border-radius:999px; border:1px solid transparent;
+    background:rgba(255,255,255,.065); color:var(--text-dim); cursor:pointer;
+    font-size:11px; transition:.2s ease;
+  }
+  .model-trigger:hover,.model-trigger.open{ color:#fff; border-color:var(--panel-border); }
+  .model-trigger .bolt{ color:var(--cyan); }
+  .model-trigger strong{ color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .model-trigger .effort-name{ color:var(--text-faint); }
+  .model-popover{
+    position:absolute; z-index:45; left:0; bottom:40px; width:min(340px,calc(100vw - 38px));
+    padding:14px; border-radius:18px; border:1px solid var(--panel-border);
+    background:linear-gradient(160deg,rgba(30,19,48,.98),rgba(13,8,25,.98));
+    box-shadow:0 20px 55px rgba(0,0,0,.55); backdrop-filter:blur(20px);
+  }
+  .model-popover-title{ color:var(--text-faint); font-size:9px; letter-spacing:.12em; text-transform:uppercase; margin:2px 4px 8px; }
+  .model-options{ display:flex; flex-direction:column; gap:4px; }
+  .model-option{
+    width:100%; display:grid; grid-template-columns:22px 1fr auto; align-items:center;
+    gap:8px; padding:9px; border:0; border-radius:10px; background:transparent;
+    color:var(--text-dim); text-align:left; cursor:pointer;
+  }
+  .model-option:hover{ background:rgba(255,255,255,.055); }
+  .model-option.active{ background:rgba(139,47,255,.13); color:#fff; }
+  .model-check{ width:17px; height:17px; border:1px solid var(--text-faint); border-radius:50%; }
+  .model-option.active .model-check{ border:5px solid var(--violet); box-shadow:0 0 10px rgba(139,47,255,.6); }
+  .model-option small{ color:var(--text-faint); }
+  .effort-panel{ margin-top:12px; padding:12px; border-top:1px solid rgba(150,110,255,.15); }
+  .effort-head{ display:flex; justify-content:space-between; color:var(--text-dim); font-size:11px; }
+  .effort-head strong{ color:var(--text); }
+  .effort-slider{ width:100%; margin:14px 0 3px; accent-color:var(--violet); cursor:pointer; }
+  .effort-scale{ display:flex; justify-content:space-between; color:var(--text-faint); font-size:8px; text-transform:uppercase; }
+  .effort-hint{ margin:9px 0 0; color:var(--text-faint); font-size:9px; line-height:1.4; }
+  .composer.max-effort .inputbar{
+    border-color:transparent;
+    background:linear-gradient(var(--panel),var(--panel)) padding-box,
+      linear-gradient(90deg,var(--cyan),var(--violet),var(--magenta),var(--gold),var(--cyan)) border-box;
+    background-size:100% 100%,240% 100%;
+    animation:maxEnergy 2.1s linear infinite;
+    box-shadow:0 0 18px rgba(139,47,255,.32),0 0 32px rgba(41,230,255,.12);
+  }
+  @keyframes maxEnergy{ to{ background-position:0 0,240% 0; } }
+  .mode-badge{ color:var(--gold); font-size:9px; text-transform:uppercase; }
   .user-name{ font-family:var(--mono); font-size:11px; color:var(--text-dim); }
   .icon-btn{
     background:var(--panel); border:1px solid var(--panel-border); color:var(--text-dim);
@@ -124,6 +174,7 @@
     transition: transform .15s ease-out;
   }
   .orb{
+    position:relative;
     width:76px; height:76px; border-radius:50%;
     background: radial-gradient(circle at 35% 30%, #fff, var(--violet) 35%, var(--magenta) 70%, transparent 100%);
     box-shadow:
@@ -171,6 +222,63 @@
   .deity-sub{
     margin:0; font-size:12.5px; letter-spacing:0.12em; color:var(--text-faint); text-transform:uppercase;
   }
+  .mode-notice{
+    margin-top:10px; min-height:25px; display:flex; align-items:center; gap:7px;
+    max-width:min(94vw,620px); text-align:center; line-height:1.35;
+    padding:5px 10px; border:1px solid transparent; border-radius:999px;
+    color:var(--text-faint); font-family:var(--mono); font-size:9px;
+    letter-spacing:.05em; opacity:0; transform:translateY(-4px);
+  }
+  .mode-notice.visible{ opacity:1; transform:translateY(0); }
+
+  /* O modo temporário é deliberadamente discreto e sem aparência de memória. */
+  body.mode-temporary .nebula{ opacity:.24; filter:blur(18px) grayscale(.7); }
+  body.mode-temporary canvas#stars{ opacity:.34; }
+  body.mode-temporary .orb{
+    width:62px; height:62px; filter:saturate(.25);
+    background:radial-gradient(circle at 35% 30%,#e9f6ff,#60758f 42%,#263347 76%,transparent 100%);
+    box-shadow:0 0 25px rgba(147,190,220,.22),0 0 70px rgba(94,125,150,.1);
+  }
+  body.mode-temporary .ring{ stroke:rgba(155,180,205,.22); animation-duration:28s; }
+  body.mode-temporary .deity-name{
+    background:linear-gradient(90deg,#8fa4b6,#e9f4fb,#788b9e);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  body.mode-temporary .deity-sub{ color:#718294; }
+  body.mode-temporary .mode-notice{
+    color:#a8bdcd; border-color:rgba(155,180,205,.18); background:rgba(94,125,150,.07);
+  }
+  body.mode-temporary .inputbar{ border-style:dashed; box-shadow:none; }
+  body.mode-temporary .composer.max-effort .inputbar{
+    border:1px dashed rgba(170,205,225,.35); background:rgba(30,42,56,.28);
+    animation:none; box-shadow:0 0 16px rgba(120,170,200,.08);
+  }
+
+  /* A sala compartilhada representa visualmente os três criadores. */
+  body.mode-shared .nebula{
+    background:radial-gradient(ellipse 42% 36% at 22% 18%,rgba(41,230,255,.2),transparent 60%),
+      radial-gradient(ellipse 42% 38% at 82% 25%,rgba(255,47,214,.19),transparent 60%),
+      radial-gradient(ellipse 45% 42% at 50% 88%,rgba(255,210,63,.1),transparent 60%);
+  }
+  body.mode-shared .orb{
+    width:66px; height:66px;
+    background:radial-gradient(circle at 35% 30%,#fff,#8b2fff 40%,#29e6ff 78%,transparent 100%);
+    box-shadow:0 0 35px rgba(41,230,255,.48),0 0 80px rgba(139,47,255,.3);
+  }
+  body.mode-shared .orb::before,body.mode-shared .orb::after{
+    content:""; position:absolute; width:25px; height:25px; border-radius:50%;
+    top:42px; box-shadow:0 0 20px currentColor; animation:teamPulse 2.4s ease-in-out infinite;
+  }
+  body.mode-shared .orb::before{ left:-20px; color:var(--magenta); background:var(--magenta); }
+  body.mode-shared .orb::after{ right:-20px; color:var(--gold); background:var(--gold); animation-delay:-1.2s; }
+  @keyframes teamPulse{ 50%{ transform:translateY(-7px) scale(.82); opacity:.72; } }
+  body.mode-shared .ring1{ stroke:rgba(41,230,255,.72); }
+  body.mode-shared .ring2{ stroke:rgba(255,210,63,.62); }
+  body.mode-shared .ring3{ stroke:rgba(255,47,214,.6); }
+  body.mode-shared .mode-notice{
+    color:var(--cyan); border-color:rgba(41,230,255,.25);
+    background:linear-gradient(90deg,rgba(41,230,255,.07),rgba(255,47,214,.07));
+  }
 
   /* ================= CHAT ================= */
   .chat-zone{ min-height:0; overflow-y:auto; padding: 10px 4px 6px; display:flex; flex-direction:column; gap:14px; }
@@ -192,6 +300,12 @@
   .msg.assistant .bubble{
     background: var(--panel); border:1px solid var(--panel-border); backdrop-filter: blur(10px);
     border-bottom-left-radius:4px;
+  }
+  .sender-name{ color:var(--cyan); font-size:9px; font-family:var(--mono); margin-bottom:4px; }
+  .artifact-strip{ display:flex; flex-wrap:wrap; gap:6px; margin-top:7px; }
+  .artifact-chip{
+    border:1px solid var(--panel-border); background:rgba(139,47,255,.12);
+    color:var(--cyan); border-radius:7px; padding:6px 9px; cursor:pointer; font-size:10px;
   }
   .msg.system{ justify-content:center; }
   .msg.system .bubble{
@@ -296,7 +410,13 @@
     border:1px solid var(--panel-border); border-radius:8px; color:var(--text-dim);
     font-size:12px;
   }
-  .memory-item span{ flex:1; }
+  .memory-text{ flex:1; }
+  .memory-category{
+    flex:0 0 auto; padding:3px 6px; border-radius:999px;
+    border:1px solid rgba(150,110,255,.28); color:var(--cyan);
+    font-family:var(--mono); font-size:8px; letter-spacing:.05em;
+    text-transform:uppercase;
+  }
   .memory-item button{
     border:0; background:transparent; color:#ff7890; cursor:pointer;
   }
@@ -325,6 +445,10 @@
     background:rgba(255,255,255,.06); border-color:transparent; filter:none;
   }
   #newChatBtn{ color:var(--text); font-weight:600; }
+  #temporaryChatBtn{ color:var(--gold); }
+  #sharedChatBtn{ color:var(--cyan); }
+  .sidebar-tools{ display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+  .sidebar-tools .btn{ padding:8px; font-size:10px; }
   #adminPanelBtn{
     margin-top:auto; color:var(--text-dim); font-size:12.5px;
   }
@@ -419,6 +543,20 @@
   }
   .permission-option input{ accent-color:var(--magenta); }
   .permission-message{ min-height:18px; color:var(--cyan); font-size:11px; }
+  .search-form{ display:flex; gap:8px; }
+  .search-form input{ flex:1; }
+  .result-list{ display:flex; flex-direction:column; gap:7px; max-height:55vh; overflow:auto; margin-top:12px; }
+  .result-item{ text-align:left; }
+  .result-item small{ display:block; color:var(--cyan); margin-bottom:4px; }
+  .health-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+  .health-card{ padding:13px; border:1px solid var(--panel-border); border-radius:10px; }
+  .health-card small{ display:block; color:var(--text-faint); margin-bottom:5px; }
+  .health-ok{ color:#57f2af; } .health-off{ color:#ff7890; }
+  .artifact-body{
+    max-height:58vh; overflow:auto; white-space:pre-wrap; padding:14px;
+    background:#05020d; border:1px solid var(--panel-border); border-radius:9px;
+    font-family:var(--mono); font-size:12px; line-height:1.5;
+  }
 
   @media (max-width:900px){
     body.context-open .app{ margin-right:0; }
@@ -450,7 +588,7 @@
   <div class="auth-card">
     <form id="loginForm">
       <h2>Entrar no Oráculo</h2>
-      <p>Use uma das contas administrativas: will, gustavo ou felipe.</p>
+      <p> Acesso restrito apenas para usuários com permissão administrativa.</p>
       <input id="loginUser" autocomplete="username" placeholder="Usuário" required>
       <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Senha" required>
       <button class="btn primary" type="submit">Entrar</button>
@@ -477,6 +615,12 @@
     <button type="button" class="sidebar-collapse" id="closeSidebarBtn" aria-label="Ocultar barra lateral">‹</button>
   </div>
   <button type="button" class="btn primary" id="newChatBtn">＋ Nova conversa</button>
+  <button type="button" class="btn" id="temporaryChatBtn">◌ Chat temporário</button>
+  <button type="button" class="btn" id="sharedChatBtn">♟ Sala da equipe</button>
+  <div class="sidebar-tools">
+    <button type="button" class="btn" id="searchBtn">⌕ Pesquisar</button>
+    <button type="button" class="btn" id="healthBtn">♡ Sistema</button>
+  </div>
   <div class="chat-list" id="chatList"></div>
   <button type="button" class="btn" id="adminPanelBtn" hidden>Painel do dev-chefe</button>
   <div class="sidebar-note">
@@ -519,7 +663,7 @@
 <div class="app" id="app" hidden>
 
   <div class="hud-top">
-    <div class="hud-pill"><span class="pulse-dot" id="statusDot"></span> <b id="statusText">ONLINE</b> · <span id="modelLabel">—</span></div>
+    <div class="hud-pill"><span class="pulse-dot" id="statusDot"></span> <b id="statusText">ONLINE</b> · <span class="mode-badge" id="modeLabel">Pessoal</span></div>
     <div class="hud-actions">
       <button class="icon-btn" id="sidebarBtn" type="button">☰ Chats</button>
       <button class="icon-btn" id="contextBtn" type="button">Contexto ▤</button>
@@ -537,18 +681,72 @@
       <div class="orb" id="orb"></div>
       <div class="orbit-particles" id="orbitParticles"></div>
     </div>
-    <h1 class="deity-name">ORÁCULO</h1>
-    <p class="deity-sub">seu assistente pessoal conectado ao Groq</p>
+    <h1 class="deity-name" id="deityName">ORÁCULO</h1>
+    <p class="deity-sub" id="deitySub">seu assistente pessoal</p>
+    <div class="mode-notice" id="modeNotice"></div>
   </div>
 
   <div class="chat-zone" id="log"></div>
 
-  <form class="inputbar" id="inputForm">
-    <input id="inputField" autocomplete="off" placeholder="Pergunte ao Oráculo…" />
-    <button type="submit" id="sendBtn" aria-label="Enviar">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-    </button>
-  </form>
+  <div class="composer" id="composer">
+    <div class="model-menu-wrap">
+      <button class="model-trigger" id="modelTrigger" type="button" aria-expanded="false">
+        <span class="bolt">ϟ</span><strong id="selectedModelName">Selecionar modelo</strong>
+        <span class="effort-name" id="selectedEffortName">Médio</span><span>⌄</span>
+      </button>
+      <div class="model-popover" id="modelPopover" hidden>
+        <div class="model-popover-title">Selecionar modelo</div>
+        <div class="model-options" id="modelOptions"></div>
+        <div class="effort-panel">
+          <div class="effort-head"><span>Raciocínio</span><strong id="effortLabel">Médio</strong></div>
+          <input class="effort-slider" id="effortSlider" type="range" min="0" max="2" step="1" value="1">
+          <div class="effort-scale"><span>Rápido</span><span>Equilibrado</span><span>Máximo</span></div>
+          <p class="effort-hint">Mais raciocínio pode melhorar tarefas complexas, mas demora um pouco mais.</p>
+        </div>
+      </div>
+    </div>
+    <form class="inputbar" id="inputForm">
+      <input id="inputField" autocomplete="off" placeholder="Pergunte ao Oráculo…" />
+      <button type="submit" id="sendBtn" aria-label="Enviar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="searchOverlay">
+  <div class="modal" style="width:min(680px,94vw)">
+    <h2>Pesquisa global</h2>
+    <form class="search-form" id="searchForm">
+      <input id="searchInput" placeholder="Pesquisar conversas e memórias…" autocomplete="off">
+      <button class="btn primary" type="submit">Pesquisar</button>
+    </form>
+    <div class="result-list" id="searchResults"></div>
+    <div class="modal-actions"><button type="button" class="btn" id="closeSearch">Fechar</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="healthOverlay">
+  <div class="modal" style="width:min(600px,94vw)">
+    <h2>Saúde do sistema</h2>
+    <div class="health-grid" id="healthGrid"></div>
+    <div class="connmsg" id="healthMessage"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="refreshHealth">Atualizar</button>
+      <button type="button" class="btn primary" id="closeHealth">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="artifactOverlay">
+  <div class="modal" style="width:min(820px,96vw)">
+    <h2 id="artifactTitle">Artefato</h2>
+    <div class="artifact-body" id="artifactBody"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="copyArtifact">Copiar</button>
+      <button type="button" class="btn primary" id="closeArtifact">Fechar</button>
+    </div>
+  </div>
 </div>
 
 <div class="modal-overlay" id="modalOverlay">
@@ -560,8 +758,9 @@
     </p>
     <h2 style="margin-top:22px">Memórias automáticas</h2>
     <p style="color:var(--text-dim);line-height:1.5">
-      O Oráculo identifica preferências e informações duradouras durante a conversa.
-      Você pode revisar e excluir o que não quiser manter.
+      O Oráculo organiza informações pessoais, preferências, projetos e objetivos.
+      Fatos corrigidos substituem versões antigas, e você pode revisar ou excluir
+      qualquer memória.
     </p>
     <div class="memory-list" id="memoryList"></div>
     <div class="modal-actions">
@@ -721,7 +920,18 @@
   const log = document.getElementById("log");
   const statusDot = document.getElementById("statusDot");
   const statusText = document.getElementById("statusText");
-  const modelLabel = document.getElementById("modelLabel");
+  const composer = document.getElementById("composer");
+  const deityName = document.getElementById("deityName");
+  const deitySub = document.getElementById("deitySub");
+  const modeNotice = document.getElementById("modeNotice");
+  const modelTrigger = document.getElementById("modelTrigger");
+  const modelPopover = document.getElementById("modelPopover");
+  const modelOptions = document.getElementById("modelOptions");
+  const selectedModelName = document.getElementById("selectedModelName");
+  const selectedEffortName = document.getElementById("selectedEffortName");
+  const effortSlider = document.getElementById("effortSlider");
+  const effortLabel = document.getElementById("effortLabel");
+  const modeLabel = document.getElementById("modeLabel");
   const connMsg = document.getElementById("connMsg");
   const haloEl = document.getElementById("halo");
   const authOverlay = document.getElementById("authOverlay");
@@ -748,34 +958,119 @@
   const auditContent = document.getElementById("auditContent");
   const permissionUsers = document.getElementById("permissionUsers");
   const permissionMessage = document.getElementById("permissionMessage");
+  const searchOverlay = document.getElementById("searchOverlay");
+  const searchResults = document.getElementById("searchResults");
+  const healthOverlay = document.getElementById("healthOverlay");
+  const healthGrid = document.getElementById("healthGrid");
+  const artifactOverlay = document.getElementById("artifactOverlay");
+  const artifactBody = document.getElementById("artifactBody");
   let currentChatId = null;
   let currentAccount = null;
   let currentPermissions = {};
+  let currentMode = "private";
+  let temporaryHistory = [];
+  let activeArtifact = "";
+  let availableModels = [];
+  let currentModel = "";
+  let currentEffort = "medium";
 
-  modelLabel.textContent = "Oráculo 1.0";
+  function applyModeTheme(mode){
+    document.body.classList.toggle("mode-temporary", mode === "temporary");
+    document.body.classList.toggle("mode-shared", mode === "shared");
+    if(mode === "temporary"){
+      modeLabel.textContent = "Temporário";
+      deityName.textContent = "ORÁCULO";
+      deitySub.textContent = "sessão discreta sem histórico ou memória";
+      modeNotice.textContent = "◌ MODO TEMPORÁRIO · nada desta conversa será salvo";
+      modeNotice.classList.add("visible");
+    }else if(mode === "shared"){
+      modeLabel.textContent = "Equipe";
+      deityName.textContent = "ORÁCULO EQUIPE";
+      deitySub.textContent = "sala compartilhada dos criadores";
+      modeNotice.textContent = "♟ SALA DA EQUIPE · Felipe, Will e Gustavo podem acompanhar";
+      modeNotice.classList.add("visible");
+    }else{
+      modeLabel.textContent = "Pessoal";
+      deityName.textContent = "ORÁCULO";
+      deitySub.textContent = "seu assistente pessoal ";
+      modeNotice.textContent = "";
+      modeNotice.classList.remove("visible");
+    }
+  }
 
-  function addMessage(role, text, {typewriter=false} = {}){
+  function findArtifacts(text){
+    const artifacts = [];
+    const fence = /```([^\n]*)\n([\s\S]*?)```/g;
+    let match;
+    while((match = fence.exec(text)) !== null){
+      const language = (match[1] || "").trim();
+      const title = language.toLowerCase() === "mermaid"
+        ? "Diagrama"
+        : (language ? "Código · " + language : "Código");
+      artifacts.push({title, content:match[2].trim()});
+    }
+    const lines = text.split("\n");
+    const tables = lines.filter(line=>line.trim().startsWith("|") && line.trim().endsWith("|"));
+    if(tables.length >= 2) artifacts.push({title:"Tabela", content:tables.join("\n")});
+    const checks = lines.filter(line=>/^\s*[-*]\s+\[[ xX]\]/.test(line));
+    if(checks.length) artifacts.push({title:"Checklist", content:checks.join("\n")});
+    if(lines.length >= 6 && lines.some(line=>/^#{1,3}\s+\S/.test(line))){
+      artifacts.push({title:"Documento", content:text.trim()});
+    }
+    return artifacts.slice(0, 6);
+  }
+
+  function attachArtifacts(row, text){
+    const artifacts = findArtifacts(text);
+    if(!artifacts.length) return;
+    const strip = document.createElement("div");
+    strip.className = "artifact-strip";
+    artifacts.forEach((artifact, index)=>{
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "artifact-chip";
+      button.textContent = "▧ " + artifact.title + (artifacts.length > 1 ? " " + (index + 1) : "");
+      button.addEventListener("click", ()=>{
+        activeArtifact = artifact.content;
+        document.getElementById("artifactTitle").textContent = artifact.title;
+        artifactBody.textContent = artifact.content;
+        artifactOverlay.classList.add("show");
+      });
+      strip.appendChild(button);
+    });
+    row.querySelector(".bubble").appendChild(strip);
+  }
+
+  function addMessage(role, text, {typewriter=false, sender=""} = {}){
     const row = document.createElement("div");
     row.className = "msg " + role;
     const bubble = document.createElement("div");
     bubble.className = "bubble";
+    if(sender){
+      const name = document.createElement("div");
+      name.className = "sender-name";
+      name.textContent = sender;
+      bubble.appendChild(name);
+    }
     row.appendChild(bubble);
     log.appendChild(row);
     log.scrollTop = log.scrollHeight;
 
     if(typewriter && !reduceMotion){
       let i = 0;
+      const contentNode = document.createTextNode("");
       const caret = document.createElement("span");
       caret.className = "caret";
+      bubble.append(contentNode, caret);
       const iv = setInterval(()=>{
-        bubble.textContent = text.slice(0, i);
-        bubble.appendChild(caret);
+        contentNode.nodeValue = text.slice(0, i);
         i++;
         log.scrollTop = log.scrollHeight;
-        if(i > text.length){ clearInterval(iv); caret.remove(); }
+        if(i > text.length){ clearInterval(iv); caret.remove(); attachArtifacts(row, text); }
       }, 14);
     } else {
-      bubble.textContent = text;
+      bubble.appendChild(document.createTextNode(text));
+      attachArtifacts(row, text);
     }
     return bubble;
   }
@@ -790,11 +1085,88 @@
   }
 
   async function askAI(message){
+    const history = currentMode === "temporary" ? temporaryHistory : undefined;
     return api("/api/chat", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({message, chat_id:currentChatId})
+      body:JSON.stringify({message, chat_id:currentChatId, mode:currentMode, history})
     });
+  }
+
+  async function loadModels(){
+    const data = await api("/api/models");
+    availableModels = data.models;
+    currentModel = data.selected;
+    currentEffort = data.effort || "medium";
+    renderModelMenu();
+    updateModelUI();
+  }
+
+  function effortDetails(){
+    return [
+      {value:"low", name:"Rápido"},
+      {value:"medium", name:"Médio"},
+      {value:"high", name:"Máximo"}
+    ];
+  }
+
+  function selectedModel(){
+    return availableModels.find(model=>model.id === currentModel) || availableModels[0];
+  }
+
+  function updateModelUI(){
+    const model = selectedModel();
+    const effort = effortDetails().find(item=>item.value === currentEffort) || effortDetails()[1];
+    if(!model) return;
+    selectedModelName.textContent = model.label;
+    selectedEffortName.textContent = model.reasoning ? effort.name : "Padrão";
+    effortLabel.textContent = model.reasoning ? effort.name : "Padrão do modelo";
+    effortSlider.value = String(effortDetails().findIndex(item=>item.value === currentEffort));
+    effortSlider.disabled = !model.reasoning;
+    composer.classList.toggle("max-effort", Boolean(model.reasoning && currentEffort === "high"));
+    contextModel.textContent = model.label + (model.reasoning ? " · " + effort.name : "");
+    modelOptions.querySelectorAll(".model-option").forEach(button=>{
+      button.classList.toggle("active", button.dataset.model === currentModel);
+    });
+  }
+
+  function renderModelMenu(){
+    modelOptions.innerHTML = "";
+    availableModels.forEach(model=>{
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "model-option";
+      button.dataset.model = model.id;
+      const check = document.createElement("span");
+      check.className = "model-check";
+      const name = document.createElement("strong");
+      name.textContent = model.label;
+      const detail = document.createElement("small");
+      detail.textContent = model.reasoning ? "Raciocínio ajustável" : "Raciocínio padrão";
+      button.append(check, name, detail);
+      button.addEventListener("click", async ()=>{
+        currentModel = model.id;
+        updateModelUI();
+        await saveModelPreference();
+      });
+      modelOptions.appendChild(button);
+    });
+  }
+
+  async function saveModelPreference(){
+    modelTrigger.disabled = true;
+    try{
+      await api("/api/model", {
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:currentModel, effort:currentEffort})
+      });
+    }catch(err){
+      addMessage("system", "Não foi possível alterar o modelo: " + err.message);
+      await loadModels();
+    }finally{
+      modelTrigger.disabled = false;
+    }
   }
   function setOnline(isOnline){
     statusDot.classList.toggle("offline", !isOnline);
@@ -807,8 +1179,6 @@
       if(!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
       setOnline(Boolean(data.online));
-      modelLabel.textContent = "Oráculo 1.0";
-      contextModel.textContent = "Oráculo 1.0";
       connMsg.textContent = data.online
         ? "Backend configurado."
         : "Adicione GROQ_API_KEY ao arquivo .env e reinicie.";
@@ -823,6 +1193,9 @@
 
   function startNewChat(){
     currentChatId = null;
+    currentMode = "private";
+    temporaryHistory = [];
+    applyModeTheme("private");
     contextChatTitle.textContent = "Nova conversa";
     log.innerHTML = "";
     addMessage("system", "Nova conversa. Suas memórias pessoais continuam disponíveis.");
@@ -831,9 +1204,40 @@
     inputField.focus();
   }
 
+  function startTemporaryChat(){
+    currentChatId = null;
+    currentMode = "temporary";
+    temporaryHistory = [];
+    applyModeTheme("temporary");
+    contextChatTitle.textContent = "Chat temporário";
+    log.innerHTML = "";
+    addMessage("system", "Este chat não será salvo e não usará nem criará memórias.");
+    document.querySelectorAll(".chat-link").forEach(item=>item.classList.remove("active"));
+    if(window.innerWidth <= 600) document.body.classList.remove("sidebar-open");
+    inputField.focus();
+  }
+
+  async function openSharedChat(){
+    const data = await api("/api/shared");
+    currentChatId = data.chat.id;
+    currentMode = "shared";
+    temporaryHistory = [];
+    applyModeTheme("shared");
+    contextChatTitle.textContent = data.chat.title;
+    log.innerHTML = "";
+    if(!data.messages.length) addMessage("system", "Sala compartilhada entre Felipe, Will e Gustavo.");
+    data.messages.forEach(item=>addMessage(item.role, item.content, {
+      sender:item.role === "user" ? item.display_name : "Oráculo"
+    }));
+    document.querySelectorAll(".chat-link").forEach(item=>item.classList.remove("active"));
+    if(window.innerWidth <= 600) document.body.classList.remove("sidebar-open");
+  }
+
   async function openChat(chatId, chatTitle){
     const data = await api("/api/chats/" + chatId);
     currentChatId = chatId;
+    currentMode = "private";
+    applyModeTheme("private");
     contextChatTitle.textContent = chatTitle || "Conversa";
     log.innerHTML = "";
     data.messages.forEach(item=>addMessage(item.role, item.content));
@@ -875,6 +1279,12 @@
 
   async function loadMemories(){
     const data = await api("/api/memories");
+    const categoryLabels = {
+      personal:"Pessoal",
+      preference:"Preferência",
+      project:"Projeto",
+      goal:"Objetivo"
+    };
     memoryList.innerHTML = "";
     contextMemories.innerHTML = "";
     contextMemoryCount.textContent = data.memories.length;
@@ -889,14 +1299,18 @@
     data.memories.slice(0, 3).forEach(item=>{
       const preview = document.createElement("div");
       preview.className = "context-memory";
-      preview.textContent = item.content;
+      preview.textContent = (categoryLabels[item.category] || "Memória") + " · " + item.content;
       preview.title = item.content;
       contextMemories.appendChild(preview);
     });
     data.memories.forEach(item=>{
       const row = document.createElement("div");
       row.className = "memory-item";
+      const category = document.createElement("span");
+      category.className = "memory-category";
+      category.textContent = categoryLabels[item.category] || "Memória";
       const text = document.createElement("span");
+      text.className = "memory-text";
       text.textContent = item.content;
       const remove = document.createElement("button");
       remove.type = "button";
@@ -905,7 +1319,7 @@
         await api("/api/memories/" + item.id, {method:"DELETE"});
         await loadMemories();
       });
-      row.append(text, remove);
+      row.append(category, text, remove);
       memoryList.appendChild(row);
     });
   }
@@ -940,7 +1354,7 @@
     loginForm.hidden = false;
     changePasswordForm.hidden = true;
     startNewChat();
-    const loaders = [loadChats(), refreshStatus()];
+    const loaders = [loadChats(), loadModels(), refreshStatus()];
     if(currentPermissions.memory_access) loaders.push(loadMemories());
     await Promise.all(loaders);
   }
@@ -955,6 +1369,7 @@
     currentAccount = null;
     currentChatId = null;
     currentPermissions = {};
+    applyModeTheme("private");
     chatSidebar.hidden = true;
     contextSidebar.hidden = true;
     document.body.classList.remove("sidebar-open", "context-open");
@@ -1011,6 +1426,24 @@
   });
 
   document.getElementById("newChatBtn").addEventListener("click", startNewChat);
+  document.getElementById("temporaryChatBtn").addEventListener("click", startTemporaryChat);
+  document.getElementById("sharedChatBtn").addEventListener("click", ()=>openSharedChat().catch(err=>addMessage("system", err.message)));
+  modelTrigger.addEventListener("click", ()=>{
+    modelPopover.hidden = !modelPopover.hidden;
+    modelTrigger.classList.toggle("open", !modelPopover.hidden);
+    modelTrigger.setAttribute("aria-expanded", String(!modelPopover.hidden));
+  });
+  effortSlider.addEventListener("input", ()=>{
+    currentEffort = effortDetails()[Number(effortSlider.value)].value;
+    updateModelUI();
+  });
+  effortSlider.addEventListener("change", saveModelPreference);
+  document.addEventListener("click", event=>{
+    if(modelPopover.hidden || event.target.closest(".model-menu-wrap")) return;
+    modelPopover.hidden = true;
+    modelTrigger.classList.remove("open");
+    modelTrigger.setAttribute("aria-expanded", "false");
+  });
   document.getElementById("sidebarBtn").addEventListener("click", ()=>{
     if(window.innerWidth <= 900) document.body.classList.remove("context-open");
     document.body.classList.toggle("sidebar-open");
@@ -1027,6 +1460,111 @@
     document.body.classList.remove("context-open");
   });
   contextSettingsButton.addEventListener("click", openSettings);
+
+  async function runSearch(query){
+    searchResults.textContent = "Pesquisando…";
+    try{
+      const data = await api("/api/search?q=" + encodeURIComponent(query));
+      searchResults.innerHTML = "";
+      if(!data.results.length){
+        searchResults.textContent = "Nada encontrado.";
+        return;
+      }
+      data.results.forEach(item=>{
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "btn result-item";
+        const label = document.createElement("small");
+        label.textContent = item.kind === "memory"
+          ? "Memória pessoal"
+          : (item.scope === "shared" ? "Sala da equipe" : item.title);
+        const preview = document.createElement("span");
+        preview.textContent = item.content.slice(0, 220);
+        button.append(label, preview);
+        button.addEventListener("click", async ()=>{
+          searchOverlay.classList.remove("show");
+          if(item.kind === "memory"){
+            openSettings();
+          }else if(item.scope === "shared"){
+            await openSharedChat();
+          }else{
+            await openChat(item.chat_id, item.title);
+          }
+        });
+        searchResults.appendChild(button);
+      });
+    }catch(err){ searchResults.textContent = err.message; }
+  }
+
+  document.getElementById("searchBtn").addEventListener("click", ()=>{
+    searchOverlay.classList.add("show");
+    document.getElementById("searchInput").focus();
+  });
+  document.getElementById("searchForm").addEventListener("submit", event=>{
+    event.preventDefault();
+    runSearch(document.getElementById("searchInput").value.trim());
+  });
+  document.getElementById("closeSearch").addEventListener("click", ()=>searchOverlay.classList.remove("show"));
+  searchOverlay.addEventListener("click", event=>{ if(event.target === searchOverlay) searchOverlay.classList.remove("show"); });
+
+  function healthCard(label, value, state=""){
+    const card = document.createElement("div");
+    card.className = "health-card";
+    const caption = document.createElement("small");
+    caption.textContent = label;
+    const content = document.createElement("strong");
+    content.textContent = value;
+    if(state) content.className = state ? "health-ok" : "health-off";
+    card.append(caption, content);
+    return card;
+  }
+
+  async function loadHealth(){
+    healthGrid.textContent = "Carregando…";
+    const message = document.getElementById("healthMessage");
+    try{
+      const data = await api("/api/health");
+      const uptime = data.uptime_seconds < 3600
+        ? Math.floor(data.uptime_seconds / 60) + " min"
+        : Math.floor(data.uptime_seconds / 3600) + " h";
+      healthGrid.innerHTML = "";
+      healthGrid.append(
+        healthCard("Groq", data.groq ? "Operacional" : "Não configurado", data.groq),
+        healthCard("Banco de dados", data.database ? "Operacional" : "Falha", data.database),
+        healthCard("Home Assistant", data.home_assistant ? "Configurado" : "Não configurado", data.home_assistant),
+        healthCard("Servidor ligado", uptime),
+        healthCard("Requisições (24h)", String(data.requests_24h)),
+        healthCard("Erros (24h)", String(data.errors_24h), data.errors_24h === 0),
+        healthCard("Conversas", String(data.chats)),
+        healthCard("Mensagens / memórias", data.messages + " / " + data.memories)
+      );
+      message.textContent = "Estado atualizado agora.";
+    }catch(err){
+      healthGrid.textContent = "Não foi possível consultar o sistema.";
+      message.textContent = err.message;
+    }
+  }
+
+  document.getElementById("healthBtn").addEventListener("click", ()=>{
+    healthOverlay.classList.add("show"); loadHealth();
+  });
+  document.getElementById("refreshHealth").addEventListener("click", loadHealth);
+  document.getElementById("closeHealth").addEventListener("click", ()=>healthOverlay.classList.remove("show"));
+  healthOverlay.addEventListener("click", event=>{ if(event.target === healthOverlay) healthOverlay.classList.remove("show"); });
+  document.getElementById("closeSearch").addEventListener("click", ()=>searchOverlay.classList.remove("show"));
+  document.getElementById("artifactOverlay").addEventListener("click", event=>{
+    if(event.target === artifactOverlay) artifactOverlay.classList.remove("show");
+  });
+  document.getElementById("closeArtifact").addEventListener("click", ()=>artifactOverlay.classList.remove("show"));
+  document.getElementById("copyArtifact").addEventListener("click", async ()=>{
+    try{
+      await navigator.clipboard.writeText(activeArtifact);
+      document.getElementById("copyArtifact").textContent = "Copiado";
+      window.setTimeout(()=>document.getElementById("copyArtifact").textContent = "Copiar", 1200);
+    }catch(_err){
+      document.getElementById("copyArtifact").textContent = "Não foi possível copiar";
+    }
+  });
 
   function renderPermissionUsers(data){
     permissionUsers.innerHTML = "";
@@ -1164,7 +1702,9 @@
     thinking = true;
     haloEl.classList.add("active");
 
-    addMessage("user", text);
+    addMessage("user", text, {
+      sender:currentMode === "shared" && currentAccount ? currentAccount.display_name : ""
+    });
 
     const pending = addMessage("assistant", "…");
 
@@ -1175,12 +1715,22 @@
       contextChatTitle.textContent = data.chat_title || contextChatTitle.textContent;
       setOnline(true);
       pending.parentElement.remove();
-      addMessage("assistant", reply || "(resposta vazia)", {typewriter:true});
-      await loadChats();
+      addMessage("assistant", reply || "(resposta vazia)", {
+        typewriter:true,
+        sender:currentMode === "shared" ? "Oráculo" : ""
+      });
+      if(currentMode === "temporary"){
+        temporaryHistory.push(
+          {role:"user", content:text},
+          {role:"assistant", content:reply}
+        );
+      }else if(currentMode === "private"){
+        await loadChats();
+      }
       if(data.memory_saved){
         addMessage("system", "Informação salva na sua memória pessoal.");
       }
-      if(currentPermissions.memory_access){
+      if(currentPermissions.memory_access && currentMode === "private"){
         window.setTimeout(()=>loadMemories().catch(()=>{}), 1800);
       }
     }catch(err){

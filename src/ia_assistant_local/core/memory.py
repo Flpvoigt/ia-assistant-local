@@ -6,6 +6,7 @@ import re
 import secrets
 import sqlite3
 import time
+import unicodedata
 from pathlib import Path
 
 ADMIN_ACCOUNTS = {
@@ -31,6 +32,7 @@ DEFAULT_ADMIN_PERMISSIONS = {
     "home_read": False,
     "home_control": False,
 }
+MEMORY_CATEGORIES = frozenset({"personal", "preference", "project", "goal"})
 
 
 class MemoryStore:
@@ -68,6 +70,7 @@ class MemoryStore:
                     id INTEGER PRIMARY KEY,
                     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                     title TEXT NOT NULL DEFAULT 'Nova conversa',
+                    scope TEXT NOT NULL DEFAULT 'private',
                     created_at INTEGER NOT NULL DEFAULT (unixepoch()),
                     updated_at INTEGER NOT NULL DEFAULT (unixepoch())
                 );
@@ -82,8 +85,11 @@ class MemoryStore:
                 CREATE TABLE IF NOT EXISTS memories (
                     id INTEGER PRIMARY KEY,
                     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    category TEXT NOT NULL DEFAULT 'personal',
+                    memory_key TEXT,
                     content TEXT NOT NULL,
                     created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+                    updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
                     UNIQUE(user_id, content)
                 );
                 CREATE TABLE IF NOT EXISTS user_permissions (
@@ -92,21 +98,69 @@ class MemoryStore:
                     enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
                     PRIMARY KEY (user_id, permission)
                 );
+                CREATE TABLE IF NOT EXISTS user_preferences (
+                    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                    selected_model TEXT,
+                    reasoning_effort TEXT NOT NULL DEFAULT 'medium'
+                );
+                CREATE TABLE IF NOT EXISTS usage_events (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    model TEXT NOT NULL,
+                    success INTEGER NOT NULL CHECK (success IN (0, 1)),
+                    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+                );
                 CREATE INDEX IF NOT EXISTS chats_user_id ON chats(user_id, updated_at);
                 CREATE INDEX IF NOT EXISTS messages_user_id ON messages(user_id, id);
                 CREATE INDEX IF NOT EXISTS memories_user_id ON memories(user_id, id);
                 """
             )
-            columns = {
-                row["name"] for row in connection.execute("PRAGMA table_info(messages)")
-            }
+            columns = {row["name"] for row in connection.execute("PRAGMA table_info(messages)")}
             if "chat_id" not in columns:
                 connection.execute(
                     "ALTER TABLE messages ADD COLUMN chat_id INTEGER REFERENCES chats(id)"
                 )
+            memory_columns = {
+                row["name"] for row in connection.execute("PRAGMA table_info(memories)")
+            }
+            if "category" not in memory_columns:
+                connection.execute(
+                    "ALTER TABLE memories ADD COLUMN category TEXT NOT NULL DEFAULT 'personal'"
+                )
+            if "memory_key" not in memory_columns:
+                connection.execute("ALTER TABLE memories ADD COLUMN memory_key TEXT")
+            if "updated_at" not in memory_columns:
+                connection.execute("ALTER TABLE memories ADD COLUMN updated_at INTEGER")
+            chat_columns = {row["name"] for row in connection.execute("PRAGMA table_info(chats)")}
+            if "scope" not in chat_columns:
+                connection.execute(
+                    "ALTER TABLE chats ADD COLUMN scope TEXT NOT NULL DEFAULT 'private'"
+                )
+            preference_columns = {
+                row["name"] for row in connection.execute("PRAGMA table_info(user_preferences)")
+            }
+            if "reasoning_effort" not in preference_columns:
+                connection.execute(
+                    "ALTER TABLE user_preferences ADD COLUMN reasoning_effort TEXT "
+                    "NOT NULL DEFAULT 'medium'"
+                )
             connection.execute(
-                "UPDATE users SET role = 'owner' WHERE username = 'felipe'"
+                """
+                UPDATE memories
+                SET memory_key = 'personal.legacy_' || id
+                WHERE memory_key IS NULL OR memory_key = ''
+                """
             )
+            connection.execute(
+                "UPDATE memories SET updated_at = created_at WHERE updated_at IS NULL"
+            )
+            connection.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS memories_user_key
+                ON memories(user_id, memory_key)
+                """
+            )
+            connection.execute("UPDATE users SET role = 'owner' WHERE username = 'felipe'")
             connection.execute(
                 "UPDATE users SET role = 'admin' WHERE username IN ('will', 'gustavo')"
             )
@@ -179,9 +233,7 @@ class MemoryStore:
                 raise PermissionError("Usuário ou senha inválidos.")
             token = secrets.token_urlsafe(32)
             token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
-            connection.execute(
-                "DELETE FROM sessions WHERE expires_at <= ?", (int(time.time()),)
-            )
+            connection.execute("DELETE FROM sessions WHERE expires_at <= ?", (int(time.time()),))
             connection.execute(
                 "INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)",
                 (token_hash, row["id"], int(time.time()) + SESSION_SECONDS),
@@ -256,6 +308,23 @@ class MemoryStore:
             )
         return int(cursor.lastrowid)
 
+    def shared_chat(self, user_id: int) -> dict:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT id, title, created_at, updated_at, scope FROM chats "
+                "WHERE scope = 'shared' ORDER BY id LIMIT 1"
+            ).fetchone()
+            if row is None:
+                cursor = connection.execute(
+                    "INSERT INTO chats (user_id, title, scope) VALUES (?, ?, 'shared')",
+                    (user_id, "Sala da equipe"),
+                )
+                row = connection.execute(
+                    "SELECT id, title, created_at, updated_at, scope FROM chats WHERE id = ?",
+                    (cursor.lastrowid,),
+                ).fetchone()
+        return dict(row)
+
     def _owns_chat(self, user_id: int, chat_id: int) -> bool:
         with self._connect() as connection:
             row = connection.execute(
@@ -264,43 +333,51 @@ class MemoryStore:
             ).fetchone()
         return row is not None
 
+    def _can_access_chat(self, user_id: int, chat_id: int) -> bool:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT 1 FROM chats WHERE id = ? AND (user_id = ? OR scope = 'shared')",
+                (chat_id, user_id),
+            ).fetchone()
+        return row is not None
+
     def list_chats(self, user_id: int) -> list[dict]:
         with self._connect() as connection:
             rows = connection.execute(
                 """
-                SELECT id, title, created_at, updated_at
+                SELECT id, title, created_at, updated_at, scope
                 FROM chats
-                WHERE user_id = ?
+                WHERE user_id = ? AND scope = 'private'
                 ORDER BY updated_at DESC, id DESC
                 """,
                 (user_id,),
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def chat_messages(
-        self, user_id: int, chat_id: int, limit: int = 100
-    ) -> list[dict[str, str]]:
-        if not self._owns_chat(user_id, chat_id):
+    def chat_messages(self, user_id: int, chat_id: int, limit: int = 100) -> list[dict[str, str]]:
+        if not self._can_access_chat(user_id, chat_id):
             raise PermissionError("Conversa não encontrada.")
         with self._connect() as connection:
             rows = connection.execute(
                 """
-                SELECT role, content FROM (
-                    SELECT id, role, content
+                SELECT role, content, display_name FROM (
+                    SELECT messages.id, messages.role, messages.content,
+                           users.display_name
                     FROM messages
-                    WHERE user_id = ? AND chat_id = ?
-                    ORDER BY id DESC
+                    JOIN users ON users.id = messages.user_id
+                    WHERE chat_id = ?
+                    ORDER BY messages.id DESC
                     LIMIT ?
                 ) ORDER BY id
                 """,
-                (user_id, chat_id, limit),
+                (chat_id, limit),
             ).fetchall()
-        return [{"role": row["role"], "content": row["content"]} for row in rows]
+        return [dict(row) for row in rows]
 
     def add_message(self, user_id: int, chat_id: int, role: str, content: str) -> None:
         if role not in {"user", "assistant"}:
             raise ValueError("Papel de mensagem inválido.")
-        if not self._owns_chat(user_id, chat_id):
+        if not self._can_access_chat(user_id, chat_id):
             raise PermissionError("Conversa não encontrada.")
         with self._connect() as connection:
             connection.execute(
@@ -322,38 +399,211 @@ class MemoryStore:
                 DELETE FROM messages
                 WHERE chat_id = ?
                   AND EXISTS (
-                      SELECT 1 FROM chats WHERE id = ? AND user_id = ?
+                      SELECT 1 FROM chats
+                      WHERE id = ? AND user_id = ? AND scope = 'private'
                   )
                 """,
                 (chat_id, chat_id, user_id),
             )
             cursor = connection.execute(
-                "DELETE FROM chats WHERE id = ? AND user_id = ?",
+                "DELETE FROM chats WHERE id = ? AND user_id = ? AND scope = 'private'",
                 (chat_id, user_id),
             )
         return cursor.rowcount > 0
 
-    def add_memory(self, user_id: int, content: str) -> bool:
+    def selected_model(self, user_id: int, default: str) -> str:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT selected_model FROM user_preferences WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        return row["selected_model"] if row and row["selected_model"] else default
+
+    def set_selected_model(self, user_id: int, model: str) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO user_preferences (user_id, selected_model) VALUES (?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET selected_model = excluded.selected_model
+                """,
+                (user_id, model),
+            )
+
+    def reasoning_effort(self, user_id: int) -> str:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT reasoning_effort FROM user_preferences WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        effort = row["reasoning_effort"] if row else "medium"
+        return effort if effort in {"low", "medium", "high"} else "medium"
+
+    def set_model_preference(self, user_id: int, model: str, effort: str) -> None:
+        if effort not in {"low", "medium", "high"}:
+            raise ValueError("Nível de raciocínio inválido.")
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO user_preferences (user_id, selected_model, reasoning_effort)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    selected_model = excluded.selected_model,
+                    reasoning_effort = excluded.reasoning_effort
+                """,
+                (user_id, model, effort),
+            )
+
+    def record_usage(self, user_id: int, model: str, success: bool) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT INTO usage_events (user_id, model, success) VALUES (?, ?, ?)",
+                (user_id, model, int(success)),
+            )
+
+    def health_summary(self) -> dict:
+        with self._connect() as connection:
+            connection.execute("SELECT 1").fetchone()
+            usage = connection.execute(
+                """
+                SELECT COUNT(*) AS requests,
+                       SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) AS errors
+                FROM usage_events WHERE created_at >= unixepoch('now', '-1 day')
+                """
+            ).fetchone()
+            counts = connection.execute(
+                "SELECT (SELECT COUNT(*) FROM chats) AS chats, "
+                "(SELECT COUNT(*) FROM messages) AS messages, "
+                "(SELECT COUNT(*) FROM memories) AS memories"
+            ).fetchone()
+        return {
+            **dict(counts),
+            "requests_24h": usage["requests"],
+            "errors_24h": usage["errors"] or 0,
+        }
+
+    def search(self, user_id: int, query: str, limit: int = 40) -> list[dict]:
+        clean = " ".join(query.split())
+        if len(clean) < 2:
+            raise ValueError("Digite ao menos 2 caracteres para pesquisar.")
+        pattern = f"%{clean}%"
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT 'message' AS kind, messages.chat_id, chats.title,
+                       messages.content, messages.created_at AS result_created_at,
+                       users.display_name, chats.scope
+                FROM messages
+                JOIN chats ON chats.id = messages.chat_id
+                JOIN users ON users.id = messages.user_id
+                WHERE messages.content LIKE ? COLLATE NOCASE
+                  AND (chats.user_id = ? OR chats.scope = 'shared')
+                UNION ALL
+                SELECT 'memory', NULL, 'Memória pessoal', memories.content,
+                       memories.updated_at AS result_created_at, '', 'private'
+                FROM memories
+                WHERE memories.user_id = ? AND memories.content LIKE ? COLLATE NOCASE
+                ORDER BY result_created_at DESC
+                LIMIT ?
+                """,
+                (pattern, user_id, user_id, pattern, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    @staticmethod
+    def _clean_memory_content(content: str) -> str:
         clean = " ".join(content.split())
         if not clean:
             raise ValueError("A memória não pode ficar vazia.")
         if len(clean) > 1000:
             raise ValueError("A memória deve ter no máximo 1000 caracteres.")
+        return clean
+
+    @staticmethod
+    def _canonical_memory_key(category: str, key: str) -> tuple[str, str]:
+        normalized_category = category.strip().lower()
+        if normalized_category not in MEMORY_CATEGORIES:
+            raise ValueError("Categoria de memória inválida.")
+        normalized_key = unicodedata.normalize("NFKD", key.strip().lower())
+        normalized_key = "".join(char for char in normalized_key if not unicodedata.combining(char))
+        if normalized_key.startswith(normalized_category + "."):
+            normalized_key = normalized_key.split(".", 1)[1]
+        normalized_key = re.sub(r"[^a-z0-9]+", "_", normalized_key).strip("_")[:64]
+        if not normalized_key:
+            raise ValueError("Chave de memória inválida.")
+        return normalized_category, f"{normalized_category}.{normalized_key}"
+
+    def upsert_memory(self, user_id: int, category: str, key: str, content: str) -> str:
+        clean = self._clean_memory_content(content)
+        category, memory_key = self._canonical_memory_key(category, key)
         with self._connect() as connection:
-            cursor = connection.execute(
-                "INSERT OR IGNORE INTO memories (user_id, content) VALUES (?, ?)",
+            current = connection.execute(
+                """
+                SELECT id, category, content
+                FROM memories
+                WHERE user_id = ? AND memory_key = ?
+                """,
+                (user_id, memory_key),
+            ).fetchone()
+            if current:
+                if current["category"] == category and current["content"] == clean:
+                    return "unchanged"
+                duplicate = connection.execute(
+                    """
+                    SELECT id FROM memories
+                    WHERE user_id = ? AND lower(content) = lower(?) AND id != ?
+                    """,
+                    (user_id, clean, current["id"]),
+                ).fetchone()
+                if duplicate:
+                    connection.execute("DELETE FROM memories WHERE id = ?", (duplicate["id"],))
+                connection.execute(
+                    """
+                    UPDATE memories
+                    SET category = ?, content = ?, updated_at = unixepoch()
+                    WHERE id = ?
+                    """,
+                    (category, clean, current["id"]),
+                )
+                return "updated"
+            duplicate = connection.execute(
+                """
+                SELECT id FROM memories
+                WHERE user_id = ? AND lower(content) = lower(?)
+                """,
                 (user_id, clean),
+            ).fetchone()
+            if duplicate:
+                connection.execute(
+                    """
+                    UPDATE memories
+                    SET category = ?, memory_key = ?, updated_at = unixepoch()
+                    WHERE id = ?
+                    """,
+                    (category, memory_key, duplicate["id"]),
+                )
+                return "updated"
+            connection.execute(
+                """
+                INSERT INTO memories (user_id, category, memory_key, content)
+                VALUES (?, ?, ?, ?)
+                """,
+                (user_id, category, memory_key, clean),
             )
-        return cursor.rowcount > 0
+        return "created"
+
+    def add_memory(self, user_id: int, content: str) -> bool:
+        clean = self._clean_memory_content(content)
+        digest = hashlib.sha256(clean.casefold().encode("utf-8")).hexdigest()[:16]
+        return self.upsert_memory(user_id, "personal", f"explicit_{digest}", clean) != "unchanged"
 
     def list_memories(self, user_id: int, limit: int = 100) -> list[dict]:
         with self._connect() as connection:
             rows = connection.execute(
                 """
-                SELECT id, content, created_at
+                SELECT id, category, memory_key, content, created_at, updated_at
                 FROM memories
                 WHERE user_id = ?
-                ORDER BY id DESC
+                ORDER BY updated_at DESC, id DESC
                 LIMIT ?
                 """,
                 (user_id, limit),
@@ -368,11 +618,21 @@ class MemoryStore:
             )
         return cursor.rowcount > 0
 
+    def delete_memory_by_key(self, user_id: int, memory_key: str) -> bool:
+        category, separator, key = memory_key.partition(".")
+        if not separator:
+            return False
+        _, canonical_key = self._canonical_memory_key(category, key)
+        with self._connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM memories WHERE user_id = ? AND memory_key = ?",
+                (user_id, canonical_key),
+            )
+        return cursor.rowcount > 0
+
     def permissions_for_user(self, user_id: int) -> dict[str, bool]:
         with self._connect() as connection:
-            user = connection.execute(
-                "SELECT role FROM users WHERE id = ?", (user_id,)
-            ).fetchone()
+            user = connection.execute("SELECT role FROM users WHERE id = ?", (user_id,)).fetchone()
             if user is None:
                 raise PermissionError("Conta não encontrada.")
             if user["role"] == "owner":
@@ -403,10 +663,7 @@ class MemoryStore:
                 ORDER BY display_name
                 """
             ).fetchall()
-        return [
-            {**dict(row), "permissions": self.permissions_for_user(row["id"])}
-            for row in rows
-        ]
+        return [{**dict(row), "permissions": self.permissions_for_user(row["id"])} for row in rows]
 
     def update_user_permissions(
         self, owner_id: int, target_user_id: int, permissions: dict[str, bool]
@@ -434,18 +691,13 @@ class MemoryStore:
                 ON CONFLICT(user_id, permission)
                 DO UPDATE SET enabled = excluded.enabled
                 """,
-                [
-                    (target_user_id, key, int(enabled))
-                    for key, enabled in permissions.items()
-                ],
+                [(target_user_id, key, int(enabled)) for key, enabled in permissions.items()],
             )
         return self.permissions_for_user(target_user_id)
 
     def _require_owner(self, user_id: int) -> None:
         with self._connect() as connection:
-            row = connection.execute(
-                "SELECT role FROM users WHERE id = ?", (user_id,)
-            ).fetchone()
+            row = connection.execute("SELECT role FROM users WHERE id = ?", (user_id,)).fetchone()
         if row is None or row["role"] != "owner":
             raise PermissionError("Acesso exclusivo do administrador-chefe.")
 
@@ -458,7 +710,7 @@ class MemoryStore:
                        users.username, users.display_name
                 FROM chats
                 JOIN users ON users.id = chats.user_id
-                WHERE users.id != ?
+                WHERE users.id != ? AND chats.scope = 'private'
                 ORDER BY chats.updated_at DESC, chats.id DESC
                 """,
                 (owner_id,),

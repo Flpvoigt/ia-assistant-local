@@ -24,6 +24,7 @@ class Settings:
     groq_api_key: str | None
     groq_url: str
     groq_model: str
+    groq_models: tuple[str, ...]
     database_path: Path
     home_assistant_url: str | None
     home_assistant_token: str | None
@@ -38,10 +39,21 @@ class Settings:
         )
         if not database_path.is_absolute():
             database_path = PROJECT_ROOT / database_path
+        primary_model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+        configured_models = [
+            item.strip()
+            for item in os.getenv(
+                "GROQ_MODELS",
+                "openai/gpt-oss-120b,openai/gpt-oss-20b,llama-3.3-70b-versatile",
+            ).split(",")
+            if item.strip()
+        ]
+        models = tuple(dict.fromkeys([primary_model, *configured_models]))
         return cls(
             groq_api_key=os.getenv("GROQ_API_KEY") or None,
             groq_url=os.getenv("GROQ_URL", "https://api.groq.com/openai/v1").rstrip("/"),
-            groq_model=os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"),
+            groq_model=primary_model,
+            groq_models=models,
             database_path=database_path,
             home_assistant_url=(os.getenv("HOME_ASSISTANT_URL") or "").rstrip("/") or None,
             home_assistant_token=os.getenv("HOME_ASSISTANT_TOKEN") or None,

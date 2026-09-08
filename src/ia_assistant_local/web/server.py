@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import inspect
 import json
 import re
 import threading
+import time
 import unicodedata
 import webbrowser
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 
@@ -87,6 +90,7 @@ class AssistantServer(ThreadingHTTPServer):
         self.agent = agent
         self.settings = settings
         self.memory = memory
+        self.started_at = time.time()
 
 
 class AssistantHandler(BaseHTTPRequestHandler):
@@ -113,8 +117,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
         if cookie:
             self.send_header(
                 "Set-Cookie",
-                f"{COOKIE_NAME}={cookie}; HttpOnly; SameSite=Strict; Path=/; "
-                "Max-Age=2592000",
+                f"{COOKIE_NAME}={cookie}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000",
             )
         if clear_cookie:
             self.send_header(
@@ -152,7 +155,9 @@ class AssistantHandler(BaseHTTPRequestHandler):
             raise PermissionError(f"Seu usuário não possui permissão para: {label}.")
 
     def do_GET(self) -> None:
-        if self.path == "/":
+        parsed = urlparse(self.path)
+        path = parsed.path
+        if path == "/":
             body = Path(__file__).with_name("interface.html").read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -162,7 +167,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        if self.path == "/api/status":
+        if path == "/api/status":
             user = self.server.memory.current_user(self._session_token())
             self._send_json(
                 200,
@@ -174,13 +179,40 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 },
             )
             return
-        if self.path == "/api/me":
+        if path == "/api/me":
             try:
                 self._send_json(200, {"user": self._require_user()})
             except PermissionError as exc:
                 self._send_json(401, {"error": str(exc)})
             return
-        if self.path == "/api/permissions":
+        if path == "/api/models":
+            try:
+                user = self._require_user()
+                models = self._available_models()
+                selected = self.server.memory.selected_model(
+                    user["id"], self.server.settings.groq_model
+                )
+                if selected not in models:
+                    selected = self.server.settings.groq_model
+                self._send_json(
+                    200,
+                    {
+                        "models": [
+                            {
+                                "id": model,
+                                "label": self._model_label(model, index),
+                                "reasoning": model.startswith("openai/gpt-oss-"),
+                            }
+                            for index, model in enumerate(models)
+                        ],
+                        "selected": selected,
+                        "effort": self.server.memory.reasoning_effort(user["id"]),
+                    },
+                )
+            except PermissionError as exc:
+                self._send_json(401, {"error": str(exc)})
+            return
+        if path == "/api/permissions":
             try:
                 user = self._require_user()
                 permissions = self.server.memory.permissions_for_user(user["id"])
@@ -188,17 +220,58 @@ class AssistantHandler(BaseHTTPRequestHandler):
             except PermissionError as exc:
                 self._send_json(401, {"error": str(exc)})
             return
-        if self.path == "/api/chats":
+        if path == "/api/chats":
             try:
                 user = self._require_user()
                 self._send_json(200, {"chats": self.server.memory.list_chats(user["id"])})
             except PermissionError as exc:
                 self._send_json(401, {"error": str(exc)})
             return
-        if self.path.startswith("/api/chats/"):
+        if path == "/api/shared":
             try:
                 user = self._require_user()
-                chat_id = int(self.path.removeprefix("/api/chats/"))
+                chat = self.server.memory.shared_chat(user["id"])
+                messages = self.server.memory.chat_messages(user["id"], chat["id"])
+                self._send_json(200, {"chat": chat, "messages": messages})
+            except PermissionError as exc:
+                self._send_json(401, {"error": str(exc)})
+            return
+        if path == "/api/search":
+            try:
+                user = self._require_user()
+                query = parse_qs(parsed.query).get("q", [""])[0]
+                self._send_json(200, {"results": self.server.memory.search(user["id"], query)})
+            except PermissionError as exc:
+                self._send_json(401, {"error": str(exc)})
+            except ValueError as exc:
+                self._send_json(400, {"error": str(exc)})
+            return
+        if path == "/api/health":
+            try:
+                self._require_user()
+                summary = self.server.memory.health_summary()
+                self._send_json(
+                    200,
+                    {
+                        "groq": bool(self.server.settings.groq_api_key),
+                        "database": True,
+                        "home_assistant": bool(
+                            self.server.settings.home_assistant_url
+                            and self.server.settings.home_assistant_token
+                        ),
+                        "uptime_seconds": int(time.time() - self.server.started_at),
+                        **summary,
+                    },
+                )
+            except PermissionError as exc:
+                self._send_json(401, {"error": str(exc)})
+            except OSError as exc:
+                self._send_json(503, {"error": f"Banco indisponível: {exc}"})
+            return
+        if path.startswith("/api/chats/"):
+            try:
+                user = self._require_user()
+                chat_id = int(path.removeprefix("/api/chats/"))
                 messages = self.server.memory.chat_messages(user["id"], chat_id)
                 self._send_json(200, {"chat_id": chat_id, "messages": messages})
             except PermissionError as exc:
@@ -206,16 +279,14 @@ class AssistantHandler(BaseHTTPRequestHandler):
             except ValueError:
                 self._send_json(400, {"error": "Conversa inválida."})
             return
-        if self.path == "/api/admin/chats":
+        if path == "/api/admin/chats":
             try:
                 user = self._require_user()
-                self._send_json(
-                    200, {"chats": self.server.memory.audit_chats(user["id"])}
-                )
+                self._send_json(200, {"chats": self.server.memory.audit_chats(user["id"])})
             except PermissionError as exc:
                 self._send_json(403, {"error": str(exc)})
             return
-        if self.path == "/api/admin/permissions":
+        if path == "/api/admin/permissions":
             try:
                 user = self._require_user()
                 users = self.server.memory.permission_users(user["id"])
@@ -226,10 +297,10 @@ class AssistantHandler(BaseHTTPRequestHandler):
             except PermissionError as exc:
                 self._send_json(403, {"error": str(exc)})
             return
-        if self.path.startswith("/api/admin/chats/"):
+        if path.startswith("/api/admin/chats/"):
             try:
                 user = self._require_user()
-                chat_id = int(self.path.removeprefix("/api/admin/chats/"))
+                chat_id = int(path.removeprefix("/api/admin/chats/"))
                 result = self.server.memory.audit_messages(user["id"], chat_id)
                 self._send_json(200, result)
             except PermissionError as exc:
@@ -237,7 +308,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
             except ValueError:
                 self._send_json(400, {"error": "Conversa inválida."})
             return
-        if self.path == "/api/memories":
+        if path == "/api/memories":
             try:
                 user = self._require_user()
                 self._require_permission(user, "memory_access")
@@ -246,7 +317,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
             except PermissionError as exc:
                 self._send_json(403, {"error": str(exc)})
             return
-        if self.path == "/favicon.ico":
+        if path == "/favicon.ico":
             self.send_response(204)
             self.end_headers()
             return
@@ -281,9 +352,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 user = self._require_user()
                 self._require_permission(user, "memory_access")
                 payload = self._read_json()
-                created = self.server.memory.add_memory(
-                    user["id"], str(payload.get("content", ""))
-                )
+                created = self.server.memory.add_memory(user["id"], str(payload.get("content", "")))
                 self._send_json(201 if created else 200, {"created": created})
                 return
             if self.path == "/api/chat":
@@ -302,6 +371,16 @@ class AssistantHandler(BaseHTTPRequestHandler):
 
     def do_PUT(self) -> None:
         try:
+            if self.path == "/api/model":
+                user = self._require_user()
+                payload = self._read_json()
+                model = str(payload.get("model", ""))
+                effort = str(payload.get("effort", "medium"))
+                if model not in self._available_models():
+                    raise ValueError("Modelo não permitido.")
+                self.server.memory.set_model_preference(user["id"], model, effort)
+                self._send_json(200, {"model": model, "effort": effort})
+                return
             match = re.fullmatch(r"/api/admin/users/(\d+)/permissions", self.path)
             if match is None:
                 self._send_json(404, {"error": "Rota não encontrada."})
@@ -330,18 +409,53 @@ class AssistantHandler(BaseHTTPRequestHandler):
         if not isinstance(message, str) or not message.strip():
             raise ValueError("Mensagem vazia.")
         message = message.strip()
+        mode = str(payload.get("mode", "private"))
+        if mode not in {"private", "temporary", "shared"}:
+            raise ValueError("Modo de conversa inválido.")
+        model = self.server.memory.selected_model(user["id"], self.server.settings.groq_model)
+        if model not in self._available_models():
+            model = self.server.settings.groq_model
+        reasoning_effort = self.server.memory.reasoning_effort(user["id"])
         raw_chat_id = payload.get("chat_id")
-        if raw_chat_id is None:
+        if mode == "temporary":
+            chat_id = None
+            raw_history = payload.get("history", [])
+            if not isinstance(raw_history, list):
+                raise TypeError("Histórico temporário inválido.")
+            history = [
+                {"role": item["role"], "content": str(item["content"])[:12000]}
+                for item in raw_history[-40:]
+                if isinstance(item, dict)
+                and item.get("role") in {"user", "assistant"}
+                and isinstance(item.get("content"), str)
+            ]
+        elif mode == "shared":
+            shared = self.server.memory.shared_chat(user["id"])
+            chat_id = shared["id"]
+            rows = self.server.memory.chat_messages(user["id"], chat_id)
+            history = [
+                {
+                    "role": item["role"],
+                    "content": (
+                        f"[{item['display_name']}]: {item['content']}"
+                        if item["role"] == "user"
+                        else item["content"]
+                    ),
+                }
+                for item in rows
+            ]
+        elif raw_chat_id is None:
             chat_id = self.server.memory.create_chat(user["id"], message)
             history = []
         else:
             chat_id = int(raw_chat_id)
-            history = self.server.memory.chat_messages(user["id"], chat_id)
+            history = [
+                {"role": item["role"], "content": item["content"]}
+                for item in self.server.memory.chat_messages(user["id"], chat_id)
+            ]
         permissions = self.server.memory.permissions_for_user(user["id"])
-        memory_enabled = permissions["memory_access"]
-        memory_rows = (
-            self.server.memory.list_memories(user["id"]) if memory_enabled else []
-        )
+        memory_enabled = permissions["memory_access"] and mode == "private"
+        memory_rows = self.server.memory.list_memories(user["id"]) if memory_enabled else []
         explicit = EXPLICIT_MEMORY.match(message) if memory_enabled else None
         if explicit:
             self.server.memory.add_memory(user["id"], explicit.group(1))
@@ -351,28 +465,40 @@ class AssistantHandler(BaseHTTPRequestHandler):
             reply = CONFIDENTIALITY_REPLY
         else:
             allowed_tools = frozenset(
-                tool
-                for tool, permission in TOOL_PERMISSIONS.items()
-                if permissions[permission]
+                tool for tool, permission in TOOL_PERMISSIONS.items() if permissions[permission]
             )
-            reply = self.server.agent.ask(
-                message,
-                lambda _: False,
-                history=history,
-                memories=[item["content"] for item in memory_rows],
-                allowed_tools=allowed_tools,
-            )
-        self.server.memory.add_message(user["id"], chat_id, "user", message)
-        self.server.memory.add_message(user["id"], chat_id, "assistant", reply)
-        existing = [item["content"] for item in memory_rows]
-        if not blocked_internal_request:
+            ask_kwargs = {
+                "history": history,
+                "memories": [f"[{item['category']}] {item['content']}" for item in memory_rows],
+                "allowed_tools": allowed_tools,
+            }
+            if "model" in inspect.signature(self.server.agent.ask).parameters:
+                ask_kwargs["model"] = model
+            if "reasoning_effort" in inspect.signature(self.server.agent.ask).parameters:
+                ask_kwargs["reasoning_effort"] = reasoning_effort
+            try:
+                reply = self.server.agent.ask(message, lambda _: False, **ask_kwargs)
+                self.server.memory.record_usage(user["id"], model, True)
+            except (httpx.HTTPError, RuntimeError, TypeError, ValueError):
+                self.server.memory.record_usage(user["id"], model, False)
+                raise
+        if mode != "temporary":
+            self.server.memory.add_message(user["id"], chat_id, "user", message)
+            self.server.memory.add_message(user["id"], chat_id, "assistant", reply)
+        existing = memory_rows
+        if not blocked_internal_request and memory_enabled:
             threading.Thread(
                 target=self._learn_from_message,
                 args=(user["id"], message, existing),
                 daemon=True,
             ).start()
-        chats = self.server.memory.list_chats(user["id"])
-        title = next(item["title"] for item in chats if item["id"] == chat_id)
+        if mode == "temporary":
+            title = "Chat temporário"
+        elif mode == "shared":
+            title = "Sala da equipe"
+        else:
+            chats = self.server.memory.list_chats(user["id"])
+            title = next(item["title"] for item in chats if item["id"] == chat_id)
         self._send_json(
             200,
             {
@@ -380,15 +506,39 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 "chat_id": chat_id,
                 "chat_title": title,
                 "memory_saved": bool(explicit),
+                "mode": mode,
+                "model": model,
             },
         )
 
-    def _learn_from_message(
-        self, user_id: int, message: str, existing: list[str]
-    ) -> None:
+    def _available_models(self) -> tuple[str, ...]:
+        configured = getattr(self.server.settings, "groq_models", ())
+        models = tuple(dict.fromkeys((self.server.settings.groq_model, *configured)))
+        return models
+
+    @staticmethod
+    def _model_label(model: str, index: int) -> str:
+        lowered = model.lower()
+        if "20b" in lowered or "8b" in lowered:
+            suffix = "Rápido"
+        elif "120b" in lowered:
+            suffix = "Potente"
+        else:
+            suffix = "Equilibrado"
+        return f"Oráculo 1.{index} · {suffix}"
+
+    def _learn_from_message(self, user_id: int, message: str, existing: list[dict]) -> None:
         try:
-            for memory in self.server.agent.extract_memories(message, existing):
-                self.server.memory.add_memory(user_id, memory)
+            changes = self.server.agent.extract_memories(message, existing)
+            for memory_key in changes["forget_keys"]:
+                self.server.memory.delete_memory_by_key(user_id, memory_key)
+            for memory in changes["upserts"]:
+                self.server.memory.upsert_memory(
+                    user_id,
+                    memory["category"],
+                    memory["key"],
+                    memory["content"],
+                )
         except (httpx.HTTPError, RuntimeError, TypeError, ValueError):
             return
 
