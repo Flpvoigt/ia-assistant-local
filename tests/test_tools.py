@@ -2,8 +2,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from ia_assistant_local.home_assistant import HomeAssistantClient
-from ia_assistant_local.tools import ToolRegistry
+from ia_assistant_local.integrations.home_assistant import HomeAssistantClient
+from ia_assistant_local.integrations.tools import ToolRegistry
 
 
 def test_unknown_tool_is_denied():

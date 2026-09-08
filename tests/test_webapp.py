@@ -3,8 +3,8 @@ from types import SimpleNamespace
 
 import httpx
 
-from ia_assistant_local.memory import MemoryStore
-from ia_assistant_local.webapp import AssistantServer
+from ia_assistant_local.core.memory import MemoryStore
+from ia_assistant_local.web.server import AssistantServer
 
 
 class DummyAgent:

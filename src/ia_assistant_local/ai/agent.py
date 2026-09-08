@@ -5,7 +5,7 @@ from collections.abc import Callable
 
 import httpx
 
-from .tools import ToolRegistry
+from ..integrations.tools import ToolRegistry
 
 SYSTEM_PROMPT = """Você é o ORÁCULO, um assistente pessoal prestativo, confiável e
 objetivo. Converse naturalmente em português brasileiro e adapte a explicação ao

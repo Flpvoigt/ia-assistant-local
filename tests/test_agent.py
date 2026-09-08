@@ -2,7 +2,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from ia_assistant_local.agent import LocalAgent
+from ia_assistant_local.ai.agent import LocalAgent
 
 
 def test_groq_chat_uses_server_side_api_key():
@@ -13,7 +13,9 @@ def test_groq_chat_uses_server_side_api_key():
         "choices": [{"message": {"role": "assistant", "content": "Ola!"}}]
     }
 
-    with patch("ia_assistant_local.agent.httpx.post", return_value=response) as post:
+    with patch(
+        "ia_assistant_local.ai.agent.httpx.post", return_value=response
+    ) as post:
         answer = LocalAgent(
             "https://api.groq.com/openai/v1",
             "openai/gpt-oss-120b",
@@ -46,7 +48,7 @@ def test_memory_extraction_accepts_only_json_list():
         ]
     }
 
-    with patch("ia_assistant_local.agent.httpx.post", return_value=response):
+    with patch("ia_assistant_local.ai.agent.httpx.post", return_value=response):
         memories = LocalAgent(
             "https://api.groq.com/openai/v1",
             "openai/gpt-oss-120b",

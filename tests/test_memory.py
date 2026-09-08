@@ -1,6 +1,6 @@
 import pytest
 
-from ia_assistant_local.memory import MemoryStore
+from ia_assistant_local.core.memory import MemoryStore
 
 
 def test_three_admins_are_created_with_isolated_memory(tmp_path):

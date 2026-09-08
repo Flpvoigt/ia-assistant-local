@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .webapp import run_server
+from .web.server import run_server
 
 
 def main() -> None:

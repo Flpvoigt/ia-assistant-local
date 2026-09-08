@@ -11,11 +11,11 @@ from typing import Any
 
 import httpx
 
-from .agent import LocalAgent
-from .config import Settings
-from .home_assistant import HomeAssistantClient
-from .memory import MemoryStore
-from .tools import ToolRegistry
+from ..ai.agent import LocalAgent
+from ..core.config import Settings
+from ..core.memory import MemoryStore
+from ..integrations.home_assistant import HomeAssistantClient
+from ..integrations.tools import ToolRegistry
 
 HOST = "127.0.0.1"
 PORT = 8765
