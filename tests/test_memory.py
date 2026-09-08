@@ -1,6 +1,6 @@
 import pytest
 
-from ia_assistant_local.core.memory import MemoryStore
+from ia_assistant_local.core.memory import PERMISSION_LABELS, MemoryStore
 
 
 def test_three_admins_are_created_with_isolated_memory(tmp_path):
@@ -45,3 +45,25 @@ def test_invalid_password_is_rejected(tmp_path):
 
     with pytest.raises(PermissionError, match="inválidos"):
         store.login("will", "senha-incorreta")
+
+
+def test_owner_has_permanent_full_access_and_controls_admin_permissions(tmp_path):
+    store = MemoryStore(tmp_path / "oraculo.db")
+    credentials = dict(store.bootstrap_admins())
+    _, will = store.login("will", credentials["will"])
+    _, felipe = store.login("felipe", credentials["felipe"])
+
+    assert all(store.permissions_for_user(felipe["id"]).values())
+    updated = {key: False for key in PERMISSION_LABELS}
+    updated["system_info"] = True
+    assert store.update_user_permissions(
+        felipe["id"], will["id"], updated
+    ) == updated
+    assert store.has_permission(will["id"], "system_info")
+    assert not store.has_permission(will["id"], "memory_access")
+
+    with pytest.raises(PermissionError, match="não podem ser reduzidas"):
+        store.update_user_permissions(felipe["id"], felipe["id"], updated)
+
+    with pytest.raises(PermissionError, match="administrador-chefe"):
+        store.update_user_permissions(will["id"], will["id"], updated)

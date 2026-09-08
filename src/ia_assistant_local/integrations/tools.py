@@ -107,10 +107,22 @@ class ToolRegistry:
         ]
         return {tool.name: tool for tool in definitions}
 
-    def schemas(self) -> list[dict[str, Any]]:
-        return [tool.schema() for tool in self.tools.values()]
+    def schemas(self, allowed: frozenset[str] | None = None) -> list[dict[str, Any]]:
+        return [
+            tool.schema()
+            for tool in self.tools.values()
+            if allowed is None or tool.name in allowed
+        ]
 
-    def execute(self, name: str, arguments: dict, confirm: Callable[[str], bool]) -> Any:
+    def execute(
+        self,
+        name: str,
+        arguments: dict,
+        confirm: Callable[[str], bool],
+        allowed: frozenset[str] | None = None,
+    ) -> Any:
+        if allowed is not None and name not in allowed:
+            raise PermissionError(f"Seu usuário não tem permissão para usar {name}.")
         tool = self.tools.get(name)
         if tool is None:
             raise PermissionError(f"Ferramenta desconhecida: {name}")

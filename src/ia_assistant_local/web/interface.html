@@ -401,6 +401,24 @@
     max-height:45vh; overflow:auto; border-top:1px solid var(--panel-border);
     margin-top:12px; padding-top:12px;
   }
+  .permission-users{ display:flex; flex-direction:column; gap:10px; margin:12px 0 20px; }
+  .permission-user{
+    padding:12px; border:1px solid var(--panel-border); border-radius:10px;
+    background:rgba(255,255,255,.025);
+  }
+  .permission-user-head{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    margin-bottom:10px;
+  }
+  .permission-user-head strong{ font-size:13px; }
+  .permission-grid{
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 14px;
+  }
+  .permission-option{
+    display:flex; align-items:center; gap:8px; color:var(--text-dim); font-size:11px;
+  }
+  .permission-option input{ accent-color:var(--magenta); }
+  .permission-message{ min-height:18px; color:var(--cyan); font-size:11px; }
 
   @media (max-width:900px){
     body.context-open .app{ margin-right:0; }
@@ -409,6 +427,7 @@
 
   @media (max-width:600px){
     body.sidebar-open .app{ margin-left:0; }
+    .permission-grid{ grid-template-columns:1fr; }
     .halo{ width:150px; height:150px; }
     .orb{ width:58px; height:58px; }
     .deity-name{ font-size:26px; }
@@ -486,7 +505,7 @@
     <div class="context-label">Modelo</div>
     <div class="context-value" id="contextModel">Oráculo 1.0</div>
   </div>
-  <div class="context-card">
+  <div class="context-card" id="contextMemoryCard">
     <div class="context-label">Memória pessoal</div>
     <div class="context-value"><span id="contextMemoryCount">0</span> informações lembradas</div>
     <div class="context-memory-list" id="contextMemories"></div>
@@ -556,6 +575,12 @@
 <div class="modal-overlay" id="adminOverlay">
   <div class="modal" style="width:min(760px,94vw)">
     <h2>Painel exclusivo do dev-chefe</h2>
+    <p style="color:var(--text-dim)">
+      Controle o que cada membro da equipe pode acessar. Felipe mantém acesso total.
+    </p>
+    <div class="permission-users" id="permissionUsers"></div>
+    <div class="permission-message" id="permissionMessage"></div>
+    <h2 style="margin-top:20px">Auditoria de conversas</h2>
     <p style="color:var(--text-dim)">
       Auditoria das conversas de Will e Gustavo para validar testes e problemas.
     </p>
@@ -682,11 +707,13 @@
 
   /* ============== SETTINGS MODAL ============== */
   const modalOverlay = document.getElementById("modalOverlay");
+  const settingsButton = document.getElementById("settingsBtn");
   function openSettings(){
+    if(!currentPermissions.memory_access) return;
     modalOverlay.classList.add("show");
     loadMemories().catch(()=>{});
   }
-  document.getElementById("settingsBtn").addEventListener("click", openSettings);
+  settingsButton.addEventListener("click", openSettings);
   document.getElementById("closeModal").addEventListener("click", ()=> modalOverlay.classList.remove("show"));
   modalOverlay.addEventListener("click", (e)=>{ if(e.target === modalOverlay) modalOverlay.classList.remove("show"); });
 
@@ -711,13 +738,19 @@
   const contextModel = document.getElementById("contextModel");
   const contextMemoryCount = document.getElementById("contextMemoryCount");
   const contextMemories = document.getElementById("contextMemories");
+  const contextMemoryCard = document.getElementById("contextMemoryCard");
+  const contextButton = document.getElementById("contextBtn");
+  const contextSettingsButton = document.getElementById("contextSettingsBtn");
   const chatList = document.getElementById("chatList");
   const adminPanelBtn = document.getElementById("adminPanelBtn");
   const adminOverlay = document.getElementById("adminOverlay");
   const auditList = document.getElementById("auditList");
   const auditContent = document.getElementById("auditContent");
+  const permissionUsers = document.getElementById("permissionUsers");
+  const permissionMessage = document.getElementById("permissionMessage");
   let currentChatId = null;
   let currentAccount = null;
+  let currentPermissions = {};
 
   modelLabel.textContent = "Oráculo 1.0";
 
@@ -877,21 +910,39 @@
     });
   }
 
+  function applyPermissions(permissions){
+    currentPermissions = permissions;
+    const memoryAllowed = Boolean(permissions.memory_access);
+    const contextAllowed = Boolean(permissions.context_panel);
+    settingsButton.hidden = !memoryAllowed;
+    contextSettingsButton.hidden = !memoryAllowed;
+    contextMemoryCard.hidden = !memoryAllowed;
+    contextButton.hidden = !contextAllowed;
+    contextSidebar.hidden = !contextAllowed;
+    if(!contextAllowed) document.body.classList.remove("context-open");
+  }
+
   async function activateUser(user){
     currentAccount = user;
+    const permissionData = await api("/api/permissions");
+    applyPermissions(permissionData.permissions);
     sidebarCurrentUser.textContent = user.display_name;
     sidebarUserRole.textContent = user.role === "owner" ? "dev-chefe" : "administrador";
     userAvatar.textContent = user.display_name.slice(0, 2).toUpperCase();
     adminPanelBtn.hidden = user.role !== "owner";
     chatSidebar.hidden = false;
-    contextSidebar.hidden = false;
     document.body.classList.add("sidebar-open");
-    document.body.classList.toggle("context-open", window.innerWidth > 900);
+    document.body.classList.toggle(
+      "context-open",
+      Boolean(currentPermissions.context_panel) && window.innerWidth > 900
+    );
     authOverlay.hidden = true;
     loginForm.hidden = false;
     changePasswordForm.hidden = true;
     startNewChat();
-    await Promise.all([loadChats(), loadMemories(), refreshStatus()]);
+    const loaders = [loadChats(), refreshStatus()];
+    if(currentPermissions.memory_access) loaders.push(loadMemories());
+    await Promise.all(loaders);
   }
 
   function showLogin(message=""){
@@ -903,6 +954,7 @@
     userAvatar.textContent = "?";
     currentAccount = null;
     currentChatId = null;
+    currentPermissions = {};
     chatSidebar.hidden = true;
     contextSidebar.hidden = true;
     document.body.classList.remove("sidebar-open", "context-open");
@@ -966,22 +1018,82 @@
   document.getElementById("closeSidebarBtn").addEventListener("click", ()=>{
     document.body.classList.remove("sidebar-open");
   });
-  document.getElementById("contextBtn").addEventListener("click", ()=>{
+  contextButton.addEventListener("click", ()=>{
+    if(!currentPermissions.context_panel) return;
     if(window.innerWidth <= 900) document.body.classList.remove("sidebar-open");
     document.body.classList.toggle("context-open");
   });
   document.getElementById("closeContextBtn").addEventListener("click", ()=>{
     document.body.classList.remove("context-open");
   });
-  document.getElementById("contextSettingsBtn").addEventListener("click", openSettings);
+  contextSettingsButton.addEventListener("click", openSettings);
+
+  function renderPermissionUsers(data){
+    permissionUsers.innerHTML = "";
+    data.users.forEach(user=>{
+      const card = document.createElement("div");
+      card.className = "permission-user";
+      const head = document.createElement("div");
+      head.className = "permission-user-head";
+      const name = document.createElement("strong");
+      name.textContent = user.display_name + " (@" + user.username + ")";
+      const save = document.createElement("button");
+      save.type = "button";
+      save.className = "btn";
+      save.textContent = "Salvar";
+      head.append(name, save);
+      const grid = document.createElement("div");
+      grid.className = "permission-grid";
+      Object.entries(data.labels).forEach(([key, labelText])=>{
+        const label = document.createElement("label");
+        label.className = "permission-option";
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.dataset.permission = key;
+        input.checked = Boolean(user.permissions[key]);
+        const text = document.createElement("span");
+        text.textContent = labelText;
+        label.append(input, text);
+        grid.appendChild(label);
+      });
+      save.addEventListener("click", async ()=>{
+        const permissions = {};
+        grid.querySelectorAll("input[data-permission]").forEach(input=>{
+          permissions[input.dataset.permission] = input.checked;
+        });
+        save.disabled = true;
+        permissionMessage.textContent = "Salvando permissões de " + user.display_name + "…";
+        try{
+          await api("/api/admin/users/" + user.id + "/permissions", {
+            method:"PUT",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({permissions})
+          });
+          permissionMessage.textContent = "Permissões de " + user.display_name + " atualizadas.";
+        }catch(err){
+          permissionMessage.textContent = err.message;
+        }finally{
+          save.disabled = false;
+        }
+      });
+      card.append(head, grid);
+      permissionUsers.appendChild(card);
+    });
+  }
 
   async function openAdminPanel(){
     if(!currentAccount || currentAccount.role !== "owner") return;
     adminOverlay.classList.add("show");
     auditContent.innerHTML = "";
     auditList.textContent = "Carregando…";
+    permissionUsers.textContent = "Carregando permissões…";
+    permissionMessage.textContent = "";
     try{
-      const data = await api("/api/admin/chats");
+      const [data, permissionData] = await Promise.all([
+        api("/api/admin/chats"),
+        api("/api/admin/permissions")
+      ]);
+      renderPermissionUsers(permissionData);
       auditList.innerHTML = "";
       if(!data.chats.length){
         auditList.textContent = "Will e Gustavo ainda não possuem conversas.";
@@ -1068,7 +1180,9 @@
       if(data.memory_saved){
         addMessage("system", "Informação salva na sua memória pessoal.");
       }
-      window.setTimeout(()=>loadMemories().catch(()=>{}), 1800);
+      if(currentPermissions.memory_access){
+        window.setTimeout(()=>loadMemories().catch(()=>{}), 1800);
+      }
     }catch(err){
       setOnline(false);
       pending.parentElement.remove();

@@ -15,6 +15,22 @@ ADMIN_ACCOUNTS = {
 }
 USERNAME_RE = re.compile(r"^[a-z0-9_-]{3,32}$")
 SESSION_SECONDS = 60 * 60 * 24 * 30
+PERMISSION_LABELS = {
+    "memory_access": "Memórias pessoais",
+    "context_panel": "Painel de contexto",
+    "system_info": "Informações do computador",
+    "open_application": "Abrir aplicativos",
+    "home_read": "Consultar Home Assistant",
+    "home_control": "Controlar Home Assistant",
+}
+DEFAULT_ADMIN_PERMISSIONS = {
+    "memory_access": True,
+    "context_panel": True,
+    "system_info": True,
+    "open_application": False,
+    "home_read": False,
+    "home_control": False,
+}
 
 
 class MemoryStore:
@@ -69,6 +85,12 @@ class MemoryStore:
                     content TEXT NOT NULL,
                     created_at INTEGER NOT NULL DEFAULT (unixepoch()),
                     UNIQUE(user_id, content)
+                );
+                CREATE TABLE IF NOT EXISTS user_permissions (
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    permission TEXT NOT NULL,
+                    enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+                    PRIMARY KEY (user_id, permission)
                 );
                 CREATE INDEX IF NOT EXISTS chats_user_id ON chats(user_id, updated_at);
                 CREATE INDEX IF NOT EXISTS messages_user_id ON messages(user_id, id);
@@ -345,6 +367,79 @@ class MemoryStore:
                 (memory_id, user_id),
             )
         return cursor.rowcount > 0
+
+    def permissions_for_user(self, user_id: int) -> dict[str, bool]:
+        with self._connect() as connection:
+            user = connection.execute(
+                "SELECT role FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
+            if user is None:
+                raise PermissionError("Conta não encontrada.")
+            if user["role"] == "owner":
+                return {key: True for key in PERMISSION_LABELS}
+            rows = connection.execute(
+                "SELECT permission, enabled FROM user_permissions WHERE user_id = ?",
+                (user_id,),
+            ).fetchall()
+        permissions = dict(DEFAULT_ADMIN_PERMISSIONS)
+        for row in rows:
+            if row["permission"] in permissions:
+                permissions[row["permission"]] = bool(row["enabled"])
+        return permissions
+
+    def has_permission(self, user_id: int, permission: str) -> bool:
+        if permission not in PERMISSION_LABELS:
+            return False
+        return self.permissions_for_user(user_id)[permission]
+
+    def permission_users(self, owner_id: int) -> list[dict]:
+        self._require_owner(owner_id)
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, username, display_name, role
+                FROM users
+                WHERE role != 'owner'
+                ORDER BY display_name
+                """
+            ).fetchall()
+        return [
+            {**dict(row), "permissions": self.permissions_for_user(row["id"])}
+            for row in rows
+        ]
+
+    def update_user_permissions(
+        self, owner_id: int, target_user_id: int, permissions: dict[str, bool]
+    ) -> dict[str, bool]:
+        self._require_owner(owner_id)
+        unknown = set(permissions) - set(PERMISSION_LABELS)
+        if unknown:
+            raise ValueError("Permissão desconhecida.")
+        if set(permissions) != set(PERMISSION_LABELS):
+            raise ValueError("Envie todas as permissões disponíveis.")
+        if not all(isinstance(value, bool) for value in permissions.values()):
+            raise TypeError("Cada permissão deve ser verdadeira ou falsa.")
+        with self._connect() as connection:
+            target = connection.execute(
+                "SELECT role FROM users WHERE id = ?", (target_user_id,)
+            ).fetchone()
+            if target is None:
+                raise ValueError("Usuário não encontrado.")
+            if target["role"] == "owner":
+                raise PermissionError("As permissões do dev-chefe não podem ser reduzidas.")
+            connection.executemany(
+                """
+                INSERT INTO user_permissions (user_id, permission, enabled)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id, permission)
+                DO UPDATE SET enabled = excluded.enabled
+                """,
+                [
+                    (target_user_id, key, int(enabled))
+                    for key, enabled in permissions.items()
+                ],
+            )
+        return self.permissions_for_user(target_user_id)
 
     def _require_owner(self, user_id: int) -> None:
         with self._connect() as connection:

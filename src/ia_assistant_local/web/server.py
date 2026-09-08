@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import threading
+import unicodedata
 import webbrowser
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -13,7 +14,7 @@ import httpx
 
 from ..ai.agent import LocalAgent
 from ..core.config import Settings
-from ..core.memory import MemoryStore
+from ..core.memory import PERMISSION_LABELS, MemoryStore
 from ..integrations.home_assistant import HomeAssistantClient
 from ..integrations.tools import ToolRegistry
 
@@ -25,6 +26,53 @@ EXPLICIT_MEMORY = re.compile(
     r"^\s*(?:lembre(?:-se)?(?: de)? que|memorize que|guarde que)\s+(.+?)\s*$",
     re.IGNORECASE | re.DOTALL,
 )
+INTERNAL_DETAIL_TERMS = (
+    "api",
+    "arquitetura",
+    "arquivo",
+    "backend",
+    "banco de dados",
+    "codigo",
+    "configuracao",
+    "css",
+    "endpoint",
+    "env",
+    "frontend",
+    "html",
+    "implementacao",
+    "instrucao interna",
+    "javascript",
+    "memoria interna",
+    "modelo",
+    "pasta",
+    "prompt",
+    "python",
+    "rota",
+    "servidor",
+    "sistema interno",
+)
+INTERNAL_SUBJECT_RE = re.compile(
+    r"\b(?:seu|sua|seus|suas|voce|oraculo|assistente|interface|dele|dela)\b"
+)
+CONFIDENTIALITY_REPLY = (
+    "Não posso fornecer detalhes internos sobre como o Oráculo foi construído. "
+    "A implementação do projeto é confidencial. Posso ajudar você a usar as "
+    "funções disponíveis."
+)
+TOOL_PERMISSIONS = {
+    "system_info": "system_info",
+    "open_application": "open_application",
+    "get_home_state": "home_read",
+    "turn_on_home_entity": "home_control",
+    "turn_off_home_entity": "home_control",
+}
+
+
+def is_internal_details_request(message: str) -> bool:
+    normalized = unicodedata.normalize("NFKD", message.casefold())
+    normalized = "".join(char for char in normalized if not unicodedata.combining(char))
+    has_internal_term = any(term in normalized for term in INTERNAL_DETAIL_TERMS)
+    return has_internal_term and bool(INTERNAL_SUBJECT_RE.search(normalized))
 
 
 class AssistantServer(ThreadingHTTPServer):
@@ -98,6 +146,11 @@ class AssistantHandler(BaseHTTPRequestHandler):
             raise PermissionError("Faça login para continuar.")
         return user
 
+    def _require_permission(self, user: dict, permission: str) -> None:
+        if not self.server.memory.has_permission(user["id"], permission):
+            label = PERMISSION_LABELS[permission]
+            raise PermissionError(f"Seu usuário não possui permissão para: {label}.")
+
     def do_GET(self) -> None:
         if self.path == "/":
             body = Path(__file__).with_name("interface.html").read_bytes()
@@ -124,6 +177,14 @@ class AssistantHandler(BaseHTTPRequestHandler):
         if self.path == "/api/me":
             try:
                 self._send_json(200, {"user": self._require_user()})
+            except PermissionError as exc:
+                self._send_json(401, {"error": str(exc)})
+            return
+        if self.path == "/api/permissions":
+            try:
+                user = self._require_user()
+                permissions = self.server.memory.permissions_for_user(user["id"])
+                self._send_json(200, {"permissions": permissions})
             except PermissionError as exc:
                 self._send_json(401, {"error": str(exc)})
             return
@@ -154,6 +215,17 @@ class AssistantHandler(BaseHTTPRequestHandler):
             except PermissionError as exc:
                 self._send_json(403, {"error": str(exc)})
             return
+        if self.path == "/api/admin/permissions":
+            try:
+                user = self._require_user()
+                users = self.server.memory.permission_users(user["id"])
+                self._send_json(
+                    200,
+                    {"labels": PERMISSION_LABELS, "users": users},
+                )
+            except PermissionError as exc:
+                self._send_json(403, {"error": str(exc)})
+            return
         if self.path.startswith("/api/admin/chats/"):
             try:
                 user = self._require_user()
@@ -168,10 +240,11 @@ class AssistantHandler(BaseHTTPRequestHandler):
         if self.path == "/api/memories":
             try:
                 user = self._require_user()
+                self._require_permission(user, "memory_access")
                 memories = self.server.memory.list_memories(user["id"])
                 self._send_json(200, {"memories": memories})
             except PermissionError as exc:
-                self._send_json(401, {"error": str(exc)})
+                self._send_json(403, {"error": str(exc)})
             return
         if self.path == "/favicon.ico":
             self.send_response(204)
@@ -206,6 +279,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 return
             if self.path == "/api/memories":
                 user = self._require_user()
+                self._require_permission(user, "memory_access")
                 payload = self._read_json()
                 created = self.server.memory.add_memory(
                     user["id"], str(payload.get("content", ""))
@@ -217,13 +291,34 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(404, {"error": "Rota não encontrada."})
         except PermissionError as exc:
-            self._send_json(401, {"error": str(exc)})
+            status = 401 if self.path == "/api/login" else 403
+            self._send_json(status, {"error": str(exc)})
         except (json.JSONDecodeError, TypeError, ValueError) as exc:
             self._send_json(400, {"error": str(exc)})
         except httpx.HTTPError as exc:
             self._send_json(502, {"error": f"Erro no Groq: {exc}"})
         except RuntimeError as exc:
             self._send_json(502, {"error": str(exc)})
+
+    def do_PUT(self) -> None:
+        try:
+            match = re.fullmatch(r"/api/admin/users/(\d+)/permissions", self.path)
+            if match is None:
+                self._send_json(404, {"error": "Rota não encontrada."})
+                return
+            user = self._require_user()
+            payload = self._read_json()
+            permissions = payload.get("permissions")
+            if not isinstance(permissions, dict):
+                raise TypeError("Permissões inválidas.")
+            updated = self.server.memory.update_user_permissions(
+                user["id"], int(match.group(1)), permissions
+            )
+            self._send_json(200, {"permissions": updated})
+        except PermissionError as exc:
+            self._send_json(403, {"error": str(exc)})
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            self._send_json(400, {"error": str(exc)})
 
     def _handle_chat(self) -> None:
         user = self._require_user()
@@ -242,25 +337,40 @@ class AssistantHandler(BaseHTTPRequestHandler):
         else:
             chat_id = int(raw_chat_id)
             history = self.server.memory.chat_messages(user["id"], chat_id)
-        memory_rows = self.server.memory.list_memories(user["id"])
-        explicit = EXPLICIT_MEMORY.match(message)
+        permissions = self.server.memory.permissions_for_user(user["id"])
+        memory_enabled = permissions["memory_access"]
+        memory_rows = (
+            self.server.memory.list_memories(user["id"]) if memory_enabled else []
+        )
+        explicit = EXPLICIT_MEMORY.match(message) if memory_enabled else None
         if explicit:
             self.server.memory.add_memory(user["id"], explicit.group(1))
             memory_rows = self.server.memory.list_memories(user["id"])
-        reply = self.server.agent.ask(
-            message,
-            lambda _: False,
-            history=history,
-            memories=[item["content"] for item in memory_rows],
-        )
+        blocked_internal_request = is_internal_details_request(message)
+        if blocked_internal_request:
+            reply = CONFIDENTIALITY_REPLY
+        else:
+            allowed_tools = frozenset(
+                tool
+                for tool, permission in TOOL_PERMISSIONS.items()
+                if permissions[permission]
+            )
+            reply = self.server.agent.ask(
+                message,
+                lambda _: False,
+                history=history,
+                memories=[item["content"] for item in memory_rows],
+                allowed_tools=allowed_tools,
+            )
         self.server.memory.add_message(user["id"], chat_id, "user", message)
         self.server.memory.add_message(user["id"], chat_id, "assistant", reply)
         existing = [item["content"] for item in memory_rows]
-        threading.Thread(
-            target=self._learn_from_message,
-            args=(user["id"], message, existing),
-            daemon=True,
-        ).start()
+        if not blocked_internal_request:
+            threading.Thread(
+                target=self._learn_from_message,
+                args=(user["id"], message, existing),
+                daemon=True,
+            ).start()
         chats = self.server.memory.list_chats(user["id"])
         title = next(item["title"] for item in chats if item["id"] == chat_id)
         self._send_json(
@@ -286,6 +396,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
         try:
             user = self._require_user()
             if self.path.startswith("/api/memories/"):
+                self._require_permission(user, "memory_access")
                 memory_id = int(self.path.removeprefix("/api/memories/"))
                 deleted = self.server.memory.delete_memory(user["id"], memory_id)
             elif self.path.startswith("/api/chats/"):
@@ -296,7 +407,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(200, {"deleted": deleted})
         except PermissionError as exc:
-            self._send_json(401, {"error": str(exc)})
+            self._send_json(403, {"error": str(exc)})
         except ValueError:
             self._send_json(400, {"error": "Identificador inválido."})
 

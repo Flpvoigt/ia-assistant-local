@@ -12,6 +12,21 @@ def test_unknown_tool_is_denied():
         registry.execute("run_shell", {"command": "anything"}, lambda _: True)
 
 
+def test_tool_denied_by_user_permission_is_not_executed():
+    registry = ToolRegistry(Mock())
+    with (
+        patch("subprocess.Popen") as process,
+        pytest.raises(PermissionError, match="não tem permissão"),
+    ):
+        registry.execute(
+            "open_application",
+            {"application": "calculadora"},
+            lambda _: True,
+            allowed=frozenset({"system_info"}),
+        )
+    process.assert_not_called()
+
+
 def test_action_is_not_executed_without_confirmation():
     registry = ToolRegistry(Mock())
     with patch("subprocess.Popen") as process:

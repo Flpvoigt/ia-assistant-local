@@ -81,6 +81,12 @@ conversas de `will` e `gustavo` durante validacoes e diagnosticos. Essa permissa
 tambem e validada pelo backend; esconder ou chamar a rota diretamente nao concede
 acesso aos demais usuarios. Os membros da equipe devem estar cientes dessa auditoria.
 
+No mesmo painel, Felipe pode liberar ou bloquear por usuario o acesso a memorias,
+ao painel de contexto, a informacoes do computador, a abertura de aplicativos e
+as funcoes do Home Assistant. As escolhas ficam salvas no banco local e sao
+validadas pelo servidor antes de cada uso. A conta `felipe` sempre conserva acesso
+total e suas permissoes nao podem ser reduzidas pelo painel ou pela API.
+
 O `.env` nunca deve ser enviado ao Git. Sem os dados do Home Assistant, as
 ferramentas da casa permanecem indisponiveis.
 
