@@ -4,8 +4,11 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-def _load_dotenv(path: Path = Path(".env")) -> None:
+
+def _load_dotenv(path: Path | None = None) -> None:
+    path = path or PROJECT_ROOT / ".env"
     if not path.exists():
         return
     for raw_line in path.read_text(encoding="utf-8").splitlines():
@@ -18,8 +21,10 @@ def _load_dotenv(path: Path = Path(".env")) -> None:
 
 @dataclass(frozen=True)
 class Settings:
-    ollama_url: str
-    ollama_model: str
+    groq_api_key: str | None
+    groq_url: str
+    groq_model: str
+    database_path: Path
     home_assistant_url: str | None
     home_assistant_token: str | None
     allowed_entities: frozenset[str]
@@ -28,9 +33,16 @@ class Settings:
     def from_env(cls) -> Settings:
         _load_dotenv()
         entities = os.getenv("HOME_ASSISTANT_ALLOWED_ENTITIES", "")
+        database_path = Path(
+            os.getenv("ORACULO_DATABASE_PATH", str(PROJECT_ROOT / "data" / "oraculo.db"))
+        )
+        if not database_path.is_absolute():
+            database_path = PROJECT_ROOT / database_path
         return cls(
-            ollama_url=os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/"),
-            ollama_model=os.getenv("OLLAMA_MODEL", "qwen3:8b"),
+            groq_api_key=os.getenv("GROQ_API_KEY") or None,
+            groq_url=os.getenv("GROQ_URL", "https://api.groq.com/openai/v1").rstrip("/"),
+            groq_model=os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"),
+            database_path=database_path,
             home_assistant_url=(os.getenv("HOME_ASSISTANT_URL") or "").rstrip("/") or None,
             home_assistant_token=os.getenv("HOME_ASSISTANT_TOKEN") or None,
             allowed_entities=frozenset(

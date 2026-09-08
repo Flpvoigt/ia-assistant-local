@@ -19,6 +19,9 @@ ia-assistant = "ia_assistant_local.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/ia_assistant_local"]
 
+[tool.hatch.build]
+include = ["src/ia_assistant_local/**"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
