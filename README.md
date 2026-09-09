@@ -125,6 +125,25 @@ total e suas permissoes nao podem ser reduzidas pelo painel ou pela API.
 O `.env` nunca deve ser enviado ao Git. Sem os dados do Home Assistant, as
 ferramentas da casa permanecem indisponiveis.
 
+## Menu do perfil e mascote
+
+Clique no nome da conta no rodape da barra lateral para abrir consumo individual,
+mascote, convite, configuracoes e sair. Configuracoes inclui troca de senha,
+acesso a memorias (conforme permissao) e integracoes.
+
+O mascote vive dentro da janela do Oraculo, inclusive na versao instalada pelo
+navegador. Ele caminha, escala as laterais, se pendura, acena, se alonga e cochila
+sentado na barra de mensagem. Arraste para reposicionar ou clique para focar o
+chat. Durante a digitacao ele fica sentado; janelas de configuracao pausam os
+movimentos. Alt+Shift+M mostra/oculta o mascote e Ctrl+, abre configuracoes.
+As preferencias ficam separadas por conta neste navegador. Movimento reduzido
+e respeitado; sair encerra a exibicao do mascote.
+
+O consumo mostra solicitacoes e falhas da conta nas ultimas 24 horas, incluindo
+novas tentativas. A cota restante da Groq nao e calculada por esses contadores.
+Na instalacao local, o convite compartilha orientacoes para pedir acesso ao
+responsavel; nao cria contas nem torna localhost acessivel por outro computador.
+
 ## Desenvolvimento
 
 ```powershell
@@ -135,3 +154,43 @@ python -m ruff format --check .
 
 Leia `CONTRIBUTING.md`, `docs/ARCHITECTURE.md` e `SECURITY.md` antes de
 adicionar ferramentas.
+# Anexos, pastas e PDF
+
+- Use o botão + para escolher vários arquivos ou uma pasta com subpastas. Também é
+  possível arrastar para qualquer ponto da página. Revise antes de enviar ao modelo.
+- Limites: 50 arquivos, 5 MB por arquivo, 20 MB por lote; contexto de até 60.000
+  caracteres, com até 12.000 por arquivo. Trechos limitados são indicados na revisão.
+  Arquivos não incluídos são listados. .env, chaves, bancos, .git, ambientes virtuais
+  e dependências não são importados. Revise também segredos em outros arquivos.
+- Cole imagens com Ctrl+V na caixa de mensagem. Uma miniatura removível confirma
+  o anexo; ele só será enviado à IA ao enviar a mensagem. Uma imagem por mensagem.
+- Conversão local: /pdf nome-do-arquivo, /pdf todos ou
+  “converta este arquivo para PDF”. Suporta texto/código, DOCX, PNG, JPG, WebP e PDF.
+  DOCX exporta o texto, sem preservar tabelas, imagens ou diagramação original;
+  HTML é convertido como código, não como página renderizada. Não há OCR.
+- A conversão usa o original, não o trecho resumido, com limite de 200.000 caracteres
+  ou 20 megapixels. Originais e downloads ficam somente na sessão do navegador;
+  ao trocar de conversa, sair ou recarregar, anexe novamente. Conversões locais
+  não entram no histórico compartilhado nem são enviadas ao Groq.
+- Após atualizar, execute python -m pip install -r requirements.txt no ambiente
+  virtual, reinicie o servidor e atualize a página com Ctrl+F5.
+# Lançamentos e boas-vindas
+
+No painel do dev-chefe, **Lançar nova versão** está disponível apenas à conta
+Felipe (owner, com senha definitiva). O servidor também valida essa permissão.
+O primeiro lançamento é 1.5, seguido de 2.0, 2.5 e assim por diante.
+
+Informe as novidades, verifique a prévia e confirme para criar um commit e fazer
+push para origin/main. Git precisa estar instalado, autenticado e com identidade
+de commit configurada. A main deve estar sincronizada com o remoto, sem staging
+pendente. Arquivos fora da lista permitida, arquivos privados e padrões comuns de
+segredos bloqueiam o lançamento. Isso não substitui sua revisão do código.
+Se o push falhar, o commit permanece local: confira o remoto e conclua esse push
+antes de lançar outra versão. Não há force-push nem descarte automático de arquivos.
+
+A equipe recebe o lançamento ao atualizar o projeto e reiniciar o servidor.
+O filme de abertura termina com ORÁCULO e a versão; depois aparece o guia com as
+novidades informadas no lançamento. Há botão para pular a animação e suporte a
+movimento reduzido. A conclusão é lembrada por conta, versão e navegador; limpar
+os dados do navegador ou entrar em outro dispositivo pode mostrar o guia novamente.
+Nada é publicado apenas por instalar esta melhoria.

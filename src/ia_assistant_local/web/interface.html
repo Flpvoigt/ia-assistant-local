@@ -171,7 +171,7 @@
   .effort-head strong{ color:var(--text); transition:color .18s ease; }
   .effort-control{ --effort-fill:50%; position:relative; height:44px; margin:8px 0 1px; isolation:isolate; }
   .effort-track{ position:absolute; inset:7px 0; overflow:hidden; border-radius:999px; background:#3c3c42; pointer-events:none; }
-  .effort-fill{ position:absolute; inset:0 auto 0 0; width:var(--effort-fill); border-radius:inherit; background:#527eed; transition:width .18s ease,background .2s ease; }
+  .effort-fill{ position:absolute; inset:0 auto 0 0; width:var(--effort-fill); border-radius:inherit; background:#527eed; transition:background .2s ease; }
   .effort-ticks{ position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 16px; }
   .effort-ticks i{ width:4px; height:4px; border-radius:50%; background:rgba(255,255,255,.35); }
   .effort-stars{ position:absolute; inset:0; opacity:0; transition:opacity .2s ease;
@@ -565,11 +565,11 @@
     color:var(--text-dim); background:transparent; font-size:18px;
   }
   .sidebar-collapse:hover{ color:#fff; background:rgba(255,255,255,.07); }
-  .chat-sidebar > .btn{
+  .sidebar-scroll > .btn{
     flex:0 0 auto; width:100%; min-height:36px; padding:8px 10px;
     text-align:left; border-color:transparent; background:transparent;
   }
-  .chat-sidebar > .btn:hover{
+  .sidebar-scroll > .btn:hover{
     background:rgba(255,255,255,.06); border-color:transparent; filter:none;
   }
   #newChatBtn{ color:var(--text); font-weight:600; }
@@ -820,7 +820,7 @@
   body.sidebar-open .app{ margin-left:280px; }
   .sidebar-head{ padding:0 5px 10px 9px; }
   .sidebar-title{ font-size:15px; letter-spacing:-.01em; }
-  .chat-sidebar > .btn{ min-height:38px; border-radius:10px; font-size:12px; }
+  .sidebar-scroll > .btn{ min-height:38px; border-radius:10px; font-size:12px; }
   #newChatBtn{
     margin-bottom:3px; color:#fff; background:rgba(139,92,246,.13);
     border:1px solid rgba(167,139,250,.16);
@@ -935,6 +935,7 @@
   .extension-status.active{ color:#67f1cd; background:rgba(55,235,190,.1); }
   @media(max-width:640px){ .extension-grid{ grid-template-columns:1fr; } }
 </style>
+<link rel="stylesheet" href="/desktop-ui.css">
 </head>
 <body>
 
@@ -972,30 +973,29 @@
     <div class="sidebar-title">Conversas</div>
     <button type="button" class="sidebar-collapse" id="closeSidebarBtn" aria-label="Ocultar barra lateral">‹</button>
   </div>
+  <div class="sidebar-scroll" aria-label="Navegação e conversas">
   <button type="button" class="btn primary" id="newChatBtn">＋ Nova conversa</button>
   <button type="button" class="btn" id="temporaryChatBtn">◌ Chat temporário</button>
   <button type="button" class="btn" id="sharedChatBtn">♟ Sala da equipe</button>
   <div class="sidebar-tools">
     <button type="button" class="btn" id="searchBtn">⌕ Pesquisar</button>
-    <button type="button" class="btn" id="healthBtn">♡ Sistema</button>
     <button type="button" class="btn" id="projectsBtn">▤ Projetos</button>
     <button type="button" class="btn" id="approvalsBtn">✓ Aprovações</button>
   </div>
   <button type="button" class="btn" id="workflowsBtn">⇢ Fluxos personalizados</button>
-  <button type="button" class="btn" id="extensionsBtn">◇ Integrações</button>
   <div class="sidebar-section-label">Recentes</div>
   <div class="chat-list" id="chatList"></div>
-  <button type="button" class="btn" id="adminPanelBtn" hidden>Painel do dev-chefe</button>
-  <div class="sidebar-note">
-    As conversas ficam registradas neste computador. Solicitações ao modelo usam a conexão configurada; arquivos locais só são anexados após revisão e confirmação explícita.
   </div>
   <div class="sidebar-account">
+    <button type="button" id="profileTrigger" aria-haspopup="menu" aria-expanded="false" aria-controls="profileMenu">
     <div class="user-avatar" id="userAvatar">?</div>
     <div class="user-details">
       <strong id="sidebarCurrentUser">—</strong>
       <span id="sidebarUserRole">administrador</span>
     </div>
-    <button type="button" class="sidebar-logout" id="sidebarLogoutBtn" title="Sair">↪</button>
+    <span aria-hidden="true">⌃</span>
+    </button>
+    <button type="button" id="sidebarLogoutBtn" hidden>Sair</button>
   </div>
 </aside>
 
@@ -1007,10 +1007,6 @@
   <div class="context-card">
     <div class="context-label">Conversa atual</div>
     <div class="context-value" id="contextChatTitle">Nova conversa</div>
-  </div>
-  <div class="context-card">
-    <div class="context-label">Modelo</div>
-    <div class="context-value" id="contextModel">Oráculo 1.0</div>
   </div>
   <div class="context-card" id="contextProjectCard">
     <div class="context-label">Projeto</div>
@@ -1029,7 +1025,6 @@
     <div class="context-value"><span id="contextMemoryCount">0</span> informações lembradas</div>
     <div class="context-memory-list" id="contextMemories"></div>
   </div>
-  <button type="button" class="btn" id="contextSettingsBtn">⚙ Gerenciar memórias</button>
   <div class="context-tip">
     O contexto acompanha apenas o usuário conectado. Use este painel para consultar rapidamente o que o Oráculo está usando na conversa.
   </div>
@@ -1045,7 +1040,6 @@
     <div class="hud-actions">
       <button class="icon-btn" id="sidebarBtn" type="button">☰ Chats</button>
       <button class="icon-btn" id="contextBtn" type="button">Contexto ▤</button>
-      <button id="settingsBtn" aria-label="Configurações">⚙</button>
     </div>
   </div>
 
@@ -1085,17 +1079,19 @@
               <div class="effort-ticks"><i></i><i></i><i></i></div>
               <div class="effort-stars"></div>
             </div>
-            <input class="effort-slider" id="effortSlider" type="range" min="0" max="2" step="1" value="1" aria-label="Nível de raciocínio" aria-valuetext="Médio">
+            <input class="effort-slider" id="effortSlider" type="range" min="0" max="100" step="1" value="50" aria-label="Ajuste de raciocínio" aria-valuetext="Médio">
           </div>
-          <div class="effort-scale"><span>Rápido</span><span>Equilibrado</span><span>Máximo</span></div>
-          <p class="effort-hint">Mais raciocínio pode melhorar tarefas complexas, mas demora um pouco mais.</p>
+          <div class="effort-scale"><span>Rápido</span><span>Médio</span><span>Full</span></div>
+          <p class="effort-hint">Ajuste fino do controle. O modelo recebe a faixa compatível: baixo, médio ou alto; posições dentro da mesma faixa não criam novos níveis no modelo.</p>
         </div>
       </div>
     </div>
     <div class="slash-menu" id="slashMenu" hidden></div>
     <form class="inputbar" id="inputForm">
+      <div id="composerAttachments" aria-label="Anexos preparados" aria-live="polite" hidden></div>
       <button type="button" class="attach-btn" id="attachBtn" aria-label="Anexar arquivo">＋</button>
-      <input type="file" id="attachmentInput" hidden accept=".pdf,.txt,.md,.csv,.json,.yaml,.yml,.xml,.html,.css,.js,.ts,.py,.java,.c,.cpp,.h,.sql,.log,image/png,image/jpeg,image/webp">
+      <input type="file" id="attachmentFolder" hidden webkitdirectory multiple>
+      <input type="file" id="attachmentInput" multiple hidden accept=".docx,.pdf,.txt,.md,.csv,.json,.yaml,.yml,.xml,.html,.css,.js,.ts,.py,.java,.c,.cpp,.h,.sql,.log,image/png,image/jpeg,image/webp">
       <input id="inputField" autocomplete="off" placeholder="Pergunte ao Oráculo…" />
       <button type="submit" id="sendBtn" aria-label="Enviar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
@@ -1106,14 +1102,18 @@
 
 <div class="modal-overlay" id="attachmentOverlay">
   <div class="modal" style="width:min(720px,95vw)">
-    <h2>Revisar anexo</h2>
+    <h2>Arquivos e pastas</h2>
+    <div class="modal-actions"><button type="button" class="btn" id="chooseAttachmentFiles">Escolher arquivos</button><button type="button" class="btn" id="chooseAttachmentFolder">Escolher pasta</button></div>
+    <details class="attachment-limits"><summary>Limites e privacidade</summary><p>Até 50 arquivos, 5 MB por arquivo e 20 MB por lote. Pastas privadas, .env e chaves não são incluídos. Revise os trechos antes de anexar.</p></details>
+    <div id="attachmentList" style="max-height:150px;overflow:auto"></div>
+    <p id="attachmentNotice" class="privacy-note" role="status"></p>
     <p id="attachmentMeta" style="color:var(--text-dim)"></p>
     <textarea class="attachment-preview" id="attachmentTextPreview" aria-label="Conteúdo que poderá ser enviado"></textarea>
     <img class="attachment-image" id="attachmentImagePreview" alt="Prévia do anexo" hidden>
-    <div class="privacy-note">Nada foi enviado ao Groq. Confira o conteúdo e confirme somente se deseja anexá-lo ao próximo pedido.</div>
+    <p class="attachment-hint">Os anexos só vão para a IA quando você enviar a mensagem.</p>
     <div class="modal-actions">
       <button type="button" class="btn" id="cancelAttachment">Cancelar</button>
-      <button type="button" class="btn primary" id="confirmAttachment">Confirmar para o próximo envio</button>
+      <button type="button" class="btn primary" id="confirmAttachment">Anexar selecionados</button>
     </div>
   </div>
 </div>
@@ -1249,16 +1249,8 @@
     </p>
     <h2 style="margin-top:20px">Central administrativa</h2>
     <div class="admin-shortcuts">
-      <button type="button" class="btn" data-admin-shortcut="health">Saúde do sistema</button>
-      <button type="button" class="btn" data-admin-shortcut="approvals">Aprovações</button>
-      <button type="button" class="btn" data-admin-shortcut="projects">Projetos</button>
-      <button type="button" class="btn" data-admin-shortcut="workflows">Fluxos</button>
-      <button type="button" class="btn" data-admin-shortcut="search">Pesquisa global</button>
-      <button type="button" class="btn" data-admin-shortcut="memories">Memórias</button>
-      <button type="button" class="btn" data-admin-shortcut="model">Modelos</button>
-      <button type="button" class="btn" data-admin-shortcut="team">Sala da equipe</button>
-      <button type="button" class="btn" data-admin-shortcut="extensions">Integrações</button>
       <button type="button" class="btn" data-admin-shortcut="update">Atualizar Oráculo</button>
+      <button type="button" class="btn" id="launchRelease" hidden>Lançar nova versão</button>
     </div>
     <div class="permission-users" id="permissionUsers"></div>
     <div class="permission-message" id="permissionMessage"></div>
@@ -1274,6 +1266,10 @@
   </div>
 </div>
 
+<script src="/mascot.js"></script>
+<script src="/profile.js"></script>
+<script src="/release-ui.js"></script>
+<script src="/attachments-ui.js"></script>
 <script>
 (function(){
   "use strict";
@@ -1389,13 +1385,11 @@
 
   /* ============== SETTINGS MODAL ============== */
   const modalOverlay = document.getElementById("modalOverlay");
-  const settingsButton = document.getElementById("settingsBtn");
   function openSettings(){
     if(!currentPermissions.memory_access) return;
     modalOverlay.classList.add("show");
     loadMemories().catch(()=>{});
   }
-  settingsButton.addEventListener("click", openSettings);
   document.getElementById("closeModal").addEventListener("click", ()=> modalOverlay.classList.remove("show"));
   modalOverlay.addEventListener("click", (e)=>{ if(e.target === modalOverlay) modalOverlay.classList.remove("show"); });
 
@@ -1429,14 +1423,11 @@
   const chatSidebar = document.getElementById("chatSidebar");
   const contextSidebar = document.getElementById("contextSidebar");
   const contextChatTitle = document.getElementById("contextChatTitle");
-  const contextModel = document.getElementById("contextModel");
   const contextMemoryCount = document.getElementById("contextMemoryCount");
   const contextMemories = document.getElementById("contextMemories");
   const contextMemoryCard = document.getElementById("contextMemoryCard");
   const contextButton = document.getElementById("contextBtn");
-  const contextSettingsButton = document.getElementById("contextSettingsBtn");
   const chatList = document.getElementById("chatList");
-  const adminPanelBtn = document.getElementById("adminPanelBtn");
   const adminOverlay = document.getElementById("adminOverlay");
   const auditList = document.getElementById("auditList");
   const auditContent = document.getElementById("auditContent");
@@ -1451,11 +1442,7 @@
   const projectsOverlay = document.getElementById("projectsOverlay");
   const approvalsOverlay = document.getElementById("approvalsOverlay");
   const workflowsOverlay = document.getElementById("workflowsOverlay");
-  const attachmentOverlay = document.getElementById("attachmentOverlay");
-  const attachmentInput = document.getElementById("attachmentInput");
-  const attachmentTextPreview = document.getElementById("attachmentTextPreview");
-  const attachmentImagePreview = document.getElementById("attachmentImagePreview");
-  const attachmentMeta = document.getElementById("attachmentMeta");
+
   const extensionsOverlay = document.getElementById("extensionsOverlay");
   const extensionGrid = document.getElementById("extensionGrid");
   const updateOverlay = document.getElementById("updateOverlay");
@@ -1473,11 +1460,13 @@
   let availableModels = [];
   let currentModel = "";
   let currentEffort = "medium";
+  let effortPosition = 50;
+  function effortAt(position){ return position < 25 ? "low" : position < 75 ? "medium" : "high"; }
   let currentProjectId = null;
   let availableProjects = [];
   let pendingContexts = [];
   let pendingImages = [];
-  let attachmentReview = null;
+
   let messageQueue = [];
   let processingQueue = false;
   let typewriterJobs = 0;
@@ -1684,7 +1673,7 @@
     updateConversationLayout();
     scrollLog();
 
-    if(typewriter && !reduceMotion){
+    if(typewriter && !reduceMotion && !document.body.classList.contains("layout-still")){
       let i = 0;
       typewriterJobs++;
       const chunk = Math.max(1, Math.ceil(text.length / 900));
@@ -1713,16 +1702,65 @@
 
   addMessage("system", "O Oráculo despertou. As respostas são processadas pelo Groq.");
 
+  let lastProblem = null;
+  window.addEventListener("oraculo:account",()=>{ lastProblem=null; });
+  function recordProblem(path, status, data={}){
+    const operation = path.startsWith("/api/attachments/pdf") ? "conversão para PDF" :
+      path.startsWith("/api/attachments") ? "leitura de anexo" :
+      path.startsWith("/api/chat") ? "resposta no chat" : "comunicação com o servidor";
+    let cause, next;
+    if(data.code === "groq_rate_limit"){
+      cause="A Groq recusou a solicitação porque o limite de uso foi atingido (429). Isso não indica que sua imagem esteja proibida.";
+      next=Number.isFinite(data.retry_after) && data.retry_after>0 ?
+        "Na ocasião, a Groq pediu uma espera de "+data.retry_after+" segundos. Depois disso, tente novamente; o prazo não garante que a quota já tenha sido renovada." :
+        "Aguarde a renovação do limite e tente novamente. Não recebi um prazo de liberação.";
+      next+=" O comando /pdf é local e não depende da Groq.";
+    }else if(!status){
+      cause="O navegador não conseguiu receber uma resposta do servidor. Não é possível afirmar só com isso se ele desligou ou se houve uma falha de conexão.";
+      next="Confira se o Oráculo está aberto no terminal e se a conexão com o servidor está disponível.";
+    }else if(status===401 || status===403){
+      cause="O servidor recusou o acesso (HTTP "+status+"). Pode ser sessão expirada ou falta de permissão; esta resposta sozinha não distingue os dois.";
+      next="Entre novamente e confira se sua conta tem permissão para essa função.";
+    }else if(status===400){
+      cause="O servidor recusou os dados enviados (HTTP 400). Não tenho informação suficiente para atribuir uma causa mais específica.";
+      next="Revise o pedido e o formato/tamanho dos anexos antes de tentar novamente.";
+    }else{
+      cause="A operação falhou com HTTP "+status+". Não recebi um diagnóstico estruturado que confirme a causa.";
+      next="Tente novamente mais tarde. Se continuar, consulte o painel do sistema.";
+    }
+    lastProblem={path,operation,cause,next,at:new Date(),resolved:false};
+  }
+  function explainProblem(text, force=false){
+    const clean=text.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+    const question=/\b(problema|erro|falha|acontecendo|havendo|houvendo|houve)\b|nao (funciona|responde)|deu errado/.test(clean);
+    if(!force && (!lastProblem || clean.length>220 || !question)) return false;
+    addMessage("user",text);
+    if(!lastProblem){
+      addMessage("assistant","Não registrei falhas nesta sessão. Isso não é uma verificação completa do sistema. Se aparecer um erro, poderei explicar o que foi observado.");
+      return true;
+    }
+    const p=lastProblem;
+    addMessage("assistant","O último problema observado foi na "+p.operation+", às "+p.at.toLocaleTimeString("pt-BR")+".\n\n"+
+      p.cause+"\n\n"+(p.resolved ? "Uma solicitação posterior à mesma operação respondeu com sucesso. Não posso garantir que o problema não volte." : p.next)+
+      "\n\nEsta explicação usa o erro recebido nesta sessão, sem precisar consultar a IA externa.");
+    return true;
+  }
   async function api(path, options={}){
-    const res = await fetch(path, options);
+    let res;
+    try { res = await fetch(path, options); }
+    catch(error){ recordProblem(path,0); throw error; }
     const data = await res.json().catch(()=>({}));
-    if(!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+    if(!res.ok){
+      recordProblem(path,res.status,data);
+      throw new Error(data.error || ("HTTP " + res.status));
+    }
+    if(lastProblem?.path===path) lastProblem.resolved=true;
     return data;
   }
 
   async function askAI(message){
     const history = currentMode === "temporary" ? temporaryHistory : undefined;
-    const contexts = pendingContexts.slice(0, 3).map(item=>({source:item.source, content:item.content}));
+    const contexts = pendingContexts.slice(0, 50).map(item=>({source:item.source, content:item.content}));
     return api("/api/chat", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
@@ -1741,6 +1779,13 @@
     availableModels = data.models;
     currentModel = data.selected;
     currentEffort = data.effort || "medium";
+    effortPosition = {low:0,medium:50,high:100}[currentEffort] ?? 50;
+    try{
+      const saved=localStorage.getItem("oraculo-effort-position-"+currentAccount?.id);
+      const position=Number(saved);
+      if(saved!==null && Number.isInteger(position) && position>=0 && position<=100 && effortAt(position)===currentEffort)
+        effortPosition=position;
+    }catch{}
     renderModelMenu();
     updateModelUI();
   }
@@ -1762,14 +1807,15 @@
     const effort = effortDetails().find(item=>item.value === currentEffort) || effortDetails()[1];
     if(!model) return;
     selectedModelName.textContent = model.label;
-    selectedEffortName.textContent = model.reasoning ? effort.name : "Padrão";
-    effortLabel.textContent = model.reasoning ? effort.name : "Padrão do modelo";
-    effortSlider.value = String(effortDetails().findIndex(item=>item.value === currentEffort));
+    const label=effortPosition===100 ? "Full" : currentEffort==="high" ? "Alto" : effort.name;
+    selectedEffortName.textContent = model.reasoning ? label : "Padrão";
+    effortLabel.textContent = model.reasoning ? label+" · "+effortPosition+"/100" : "Padrão do modelo";
+    effortSlider.value = String(effortPosition);
     effortSlider.disabled = !model.reasoning;
-    effortSlider.setAttribute("aria-valuetext", model.reasoning ? effort.name : "Indisponível neste modelo");
+    effortSlider.setAttribute("aria-valuetext", model.reasoning ? label+", posição "+effortPosition+" de 100, faixa "+currentEffort : "Indisponível neste modelo");
     effortControl.classList.toggle("is-disabled", !model.reasoning);
-    effortControl.style.setProperty("--effort-fill", model.reasoning ? ["16px","50%","100%"][Number(effortSlider.value)] : "0%");
-    const isMaxEffort = Boolean(model.reasoning && currentEffort === "high");
+    effortControl.style.setProperty("--effort-fill", model.reasoning ? "max(16px, "+effortPosition+"%)" : "0%");
+    const isMaxEffort = Boolean(model.reasoning && effortPosition === 100);
     composer.classList.toggle("max-effort", isMaxEffort);
     if(!isMaxEffort || !animate){
       window.clearTimeout(maxEffortActivationTimer);
@@ -1783,7 +1829,6 @@
       maxEffortActivationTimer = window.setTimeout(()=>composer.classList.remove("max-effort-activated"), 1000);
     }
     maxEffortActive = isMaxEffort;
-    contextModel.textContent = model.label + (model.reasoning ? " · " + effort.name : "");
     modelOptions.querySelectorAll(".model-option").forEach(button=>{
       button.classList.toggle("active", button.dataset.model === currentModel);
     });
@@ -1820,6 +1865,7 @@
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:currentModel, effort:currentEffort})
       });
+      try{localStorage.setItem("oraculo-effort-position-"+currentAccount?.id,String(effortPosition));}catch{}
     }catch(err){
       addMessage("system", "Não foi possível alterar o modelo: " + err.message);
       await loadModels();
@@ -1860,6 +1906,8 @@
     log.innerHTML = "";
     addMessage("system", "Nova conversa. Suas memórias pessoais continuam disponíveis.");
     pendingContexts = [];
+    pendingImages = [];
+    attachmentManager.reset();
     renderApprovedContexts();
     restoreDraft();
     document.querySelectorAll(".chat-link").forEach(item=>item.classList.remove("active"));
@@ -1878,6 +1926,8 @@
     log.innerHTML = "";
     addMessage("system", "Este chat não será salvo e não usará nem criará memórias.");
     pendingContexts = [];
+    pendingImages = [];
+    attachmentManager.reset();
     renderApprovedContexts();
     renderProjectSelect();
     restoreDraft();
@@ -1901,6 +1951,8 @@
       sender:item.role === "user" ? item.display_name : "Oráculo"
     }));
     pendingContexts = [];
+    pendingImages = [];
+    attachmentManager.reset();
     renderApprovedContexts();
     renderProjectSelect();
     restoreDraft();
@@ -1919,6 +1971,8 @@
     log.innerHTML = "";
     data.messages.forEach(item=>addMessage(item.role, item.content));
     pendingContexts = [];
+    pendingImages = [];
+    attachmentManager.reset();
     renderApprovedContexts();
     renderProjectSelect();
     restoreDraft();
@@ -2037,6 +2091,8 @@
   }
 
   function renderApprovedContexts(){
+    const tray = document.getElementById("composerAttachments");
+    tray.replaceChildren();
     approvedContexts.innerHTML = "";
     approvedContextCard.hidden = pendingContexts.length === 0;
     pendingContexts.forEach((item,index)=>{
@@ -2050,45 +2106,34 @@
       remove.textContent = "×";
       remove.title = "Não enviar este contexto";
       remove.addEventListener("click", ()=>{
+        if(item.source.startsWith("Arquivo: ")) attachmentManager.forget(item.source.slice(9));
         pendingContexts.splice(index,1);
         renderApprovedContexts();
       });
       chip.append(name, remove);
-      approvedContexts.appendChild(chip);
+      tray.appendChild(chip);
     });
     pendingImages.forEach((item,index)=>{
-      const chip = document.createElement("div"); chip.className = "context-chip";
-      const name = document.createElement("span"); name.textContent = "Imagem: " + item.name; name.title = item.name;
+      const chip = document.createElement("div"); chip.className = "attachment-thumbnail";
+      const name = document.createElement("img"); name.src = item.dataUrl; name.alt = item.name; name.title = item.name;
       const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "×"; remove.title = "Não enviar esta imagem";
-      remove.addEventListener("click", ()=>{ pendingImages.splice(index,1); renderApprovedContexts(); });
-      chip.append(name,remove); approvedContexts.appendChild(chip);
+      remove.setAttribute("aria-label", "Remover imagem " + item.name);
+      remove.addEventListener("click", ()=>{ attachmentManager.forget(item.name); pendingImages.splice(index,1); renderApprovedContexts(); });
+      chip.append(name,remove); tray.appendChild(chip);
     });
-    approvedContextCard.hidden = pendingContexts.length === 0 && pendingImages.length === 0;
+    approvedContextCard.hidden = true;
+    tray.hidden = pendingContexts.length === 0 && pendingImages.length === 0;
+    if(!tray.hidden){
+      const hint=document.createElement("small"); hint.className="attachment-ready";
+      hint.textContent="Anexado · será enviado junto com sua mensagem"; tray.appendChild(hint);
+    }
   }
 
   function addApprovedContext(source, content){
-    pendingContexts.push({source:String(source).slice(0,160), content:String(content).slice(0,4000)});
-    pendingContexts = pendingContexts.slice(-3);
+    if(pendingContexts.length>=50 || pendingContexts.reduce((n,item)=>n+item.content.length,0)+String(content).slice(0,12000).length>60000) return addMessage("system","Limite de contexto atingido. Remova um anexo antes de adicionar mais.");
+    pendingContexts.push({source:String(source).slice(0,160), content:String(content).slice(0,12000)});
     renderApprovedContexts();
     document.body.classList.add("context-open");
-  }
-
-  function readFileDataUrl(file){
-    return new Promise((resolve,reject)=>{ const reader=new FileReader(); reader.onload=()=>resolve(String(reader.result)); reader.onerror=()=>reject(new Error("Não foi possível ler o arquivo.")); reader.readAsDataURL(file); });
-  }
-
-  async function reviewAttachment(file){
-    if(!file || file.size > 5_000_000) throw new Error("Cada anexo deve ter no máximo 5 MB.");
-    const dataUrl = await readFileDataUrl(file);
-    const encoded = dataUrl.split(",",2)[1] || "";
-    const data = await api("/api/attachments/extract", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:file.name,mime_type:file.type,data:encoded})});
-    attachmentReview = {file, dataUrl, result:data.attachment};
-    attachmentMeta.textContent = file.name + " · " + Math.ceil(file.size/1024) + " KB" + (data.attachment.truncated ? " · prévia limitada" : "");
-    const image = data.attachment.kind === "image";
-    attachmentTextPreview.hidden = image; attachmentImagePreview.hidden = !image;
-    if(image){ attachmentImagePreview.src = dataUrl; attachmentTextPreview.value = ""; }
-    else { attachmentImagePreview.removeAttribute("src"); attachmentTextPreview.value = data.attachment.content || ""; }
-    attachmentOverlay.classList.add("show");
   }
 
   async function loadExtensions(){
@@ -2375,8 +2420,6 @@
     currentPermissions = permissions;
     const memoryAllowed = Boolean(permissions.memory_access);
     const contextAllowed = Boolean(permissions.context_panel);
-    settingsButton.hidden = !memoryAllowed;
-    contextSettingsButton.hidden = !memoryAllowed;
     contextMemoryCard.hidden = !memoryAllowed;
     contextButton.hidden = !contextAllowed;
     contextSidebar.hidden = !contextAllowed;
@@ -2389,15 +2432,15 @@
     currentAccount = user;
     const permissionData = await api("/api/permissions");
     applyPermissions(permissionData.permissions);
+    window.dispatchEvent(new CustomEvent("oraculo:account", {detail:{user, permissions:permissionData.permissions}}));
     sidebarCurrentUser.textContent = user.display_name;
     sidebarUserRole.textContent = user.role === "owner" ? "dev-chefe" : "administrador";
     userAvatar.textContent = user.display_name.slice(0, 2).toUpperCase();
-    adminPanelBtn.hidden = user.role !== "owner";
     chatSidebar.hidden = false;
     document.body.classList.add("sidebar-open");
     document.body.classList.toggle(
       "context-open",
-      Boolean(currentPermissions.context_panel) && window.innerWidth > 900
+      Boolean(currentPermissions.context_panel) && window.innerWidth > 1280
     );
     authOverlay.hidden = true;
     loginForm.hidden = false;
@@ -2417,6 +2460,7 @@
     sidebarUserRole.textContent = "administrador";
     userAvatar.textContent = "?";
     currentAccount = null;
+    window.dispatchEvent(new CustomEvent("oraculo:account", {detail:{user:null, permissions:{}}}));
     currentChatId = null;
     currentPermissions = {};
     applyModeTheme("private");
@@ -2484,7 +2528,8 @@
     modelTrigger.setAttribute("aria-expanded", String(!modelPopover.hidden));
   });
   effortSlider.addEventListener("input", ()=>{
-    currentEffort = effortDetails()[Number(effortSlider.value)].value;
+    effortPosition = Number(effortSlider.value);
+    currentEffort = effortAt(effortPosition);
     updateModelUI({animate:true});
   });
   effortSlider.addEventListener("change", saveModelPreference);
@@ -2509,7 +2554,6 @@
   document.getElementById("closeContextBtn").addEventListener("click", ()=>{
     document.body.classList.remove("context-open");
   });
-  contextSettingsButton.addEventListener("click", openSettings);
   projectSelect.addEventListener("change", ()=>{
     saveDraft();
     currentProjectId = projectSelect.value ? Number(projectSelect.value) : null;
@@ -2669,9 +2713,9 @@
     }
   }
 
-  document.getElementById("healthBtn").addEventListener("click", ()=>{
+  function openHealth(){
     healthOverlay.classList.add("show"); loadHealth();
-  });
+  }
   document.getElementById("refreshHealth").addEventListener("click", loadHealth);
   document.getElementById("closeHealth").addEventListener("click", ()=>healthOverlay.classList.remove("show"));
   healthOverlay.addEventListener("click", event=>{ if(event.target === healthOverlay) healthOverlay.classList.remove("show"); });
@@ -2791,20 +2835,15 @@
     });
   }
 
-  adminPanelBtn.addEventListener("click", openAdminPanel);
+  window.addEventListener("oraculo:open-panel", event=>{
+    if(!currentAccount) return;
+    const panels={memories:openSettings,integrations:openExtensions,health:openHealth,admin:openAdminPanel};
+    panels[event.detail]?.();
+  });
   document.querySelectorAll("[data-admin-shortcut]").forEach(button=>{
     button.addEventListener("click", ()=>{
       const action = button.dataset.adminShortcut;
       adminOverlay.classList.remove("show");
-      if(action === "health") document.getElementById("healthBtn").click();
-      if(action === "approvals") document.getElementById("approvalsBtn").click();
-      if(action === "projects") document.getElementById("projectsBtn").click();
-      if(action === "workflows") document.getElementById("workflowsBtn").click();
-      if(action === "search") document.getElementById("searchBtn").click();
-      if(action === "memories") openSettings();
-      if(action === "model") modelTrigger.click();
-      if(action === "team") openSharedChat().catch(err=>addMessage("system",err.message));
-      if(action === "extensions") document.getElementById("extensionsBtn").click();
       if(action === "update"){
         updateOverlay.classList.add("show");
         showUpdateStatus(false).catch(err=>document.getElementById("updateStatus").textContent=err.message);
@@ -2838,31 +2877,23 @@
   const slashMenu = document.getElementById("slashMenu");
   let slashSelection = 0;
 
-  document.getElementById("attachBtn").addEventListener("click", ()=>attachmentInput.click());
-  attachmentInput.addEventListener("change", async()=>{
-    for(const file of [...attachmentInput.files]){
-      try{ await reviewAttachment(file); break; }catch(err){ addMessage("system", "Anexo recusado: " + err.message); }
+  const attachmentManager = window.installAttachments({
+    api, message:addMessage, getAccount:()=>currentAccount,
+    addContexts(items){
+      const combined=[...pendingContexts,...items];
+      if(combined.length>50 || combined.reduce((n,item)=>n+item.content.length,0)>60000)
+        throw new Error("Limite de contexto atingido. Remova anexos preparados antes de adicionar mais.");
+      pendingContexts=combined; renderApprovedContexts();
+    },
+    addImage(item){ pendingImages=[item]; renderApprovedContexts(); },
+    imageCount:()=>pendingImages.length,
+    onConverted(name){
+      pendingImages=pendingImages.filter(item=>item.name!==name);
+      pendingContexts=pendingContexts.filter(item=>item.source!=="Arquivo: "+name);
+      renderApprovedContexts();
     }
-    attachmentInput.value = "";
   });
-  document.getElementById("cancelAttachment").addEventListener("click", ()=>{ attachmentReview=null; attachmentOverlay.classList.remove("show"); });
-  document.getElementById("confirmAttachment").addEventListener("click", ()=>{
-    if(!attachmentReview) return;
-    if(attachmentReview.result.kind === "image"){
-      pendingImages.push({name:attachmentReview.file.name,dataUrl:attachmentReview.dataUrl});
-      pendingImages = pendingImages.slice(-1);
-    }else{
-      const reviewed = attachmentTextPreview.value.trim();
-      if(!reviewed) return addMessage("system", "O trecho revisado está vazio.");
-      addApprovedContext("Arquivo: " + attachmentReview.file.name, reviewed);
-    }
-    attachmentReview=null; attachmentOverlay.classList.remove("show"); renderApprovedContexts();
-    document.body.classList.add("context-open"); inputField.focus();
-  });
-  for(const eventName of ["dragenter","dragover"]){ composer.addEventListener(eventName,event=>{ event.preventDefault(); composer.classList.add("drop-active"); }); }
-  for(const eventName of ["dragleave","drop"]){ composer.addEventListener(eventName,event=>{ event.preventDefault(); composer.classList.remove("drop-active"); }); }
-  composer.addEventListener("drop", event=>{ const file=event.dataTransfer.files[0]; if(file) reviewAttachment(file).catch(err=>addMessage("system","Anexo recusado: "+err.message)); });
-  document.getElementById("extensionsBtn").addEventListener("click", ()=>{ extensionsOverlay.classList.add("show"); loadExtensions().catch(err=>extensionGrid.textContent=err.message); });
+  function openExtensions(){ extensionsOverlay.classList.add("show"); loadExtensions().catch(err=>extensionGrid.textContent=err.message); }
   document.getElementById("closeExtensions").addEventListener("click", ()=>extensionsOverlay.classList.remove("show"));
   document.getElementById("closeUpdate").addEventListener("click", ()=>updateOverlay.classList.remove("show"));
   document.getElementById("checkUpdate").addEventListener("click", ()=>showUpdateStatus(true).catch(err=>document.getElementById("updateStatus").textContent=err.message));
@@ -2886,15 +2917,17 @@
       field.focus();
       if(args) await runSearch(args);
     }},
-    {name:"/sistema", description:"Ver a saúde e o estado online", run:()=>document.getElementById("healthBtn").click()},
+    {name:"/sistema", description:"Ver a saúde e o estado online", run:openHealth},
     {name:"/projetos", description:"Abrir conhecimento por projeto", allowed:()=>Boolean(currentPermissions.project_access), run:()=>document.getElementById("projectsBtn").click()},
     {name:"/aprovacoes", description:"Revisar ações pendentes", run:()=>document.getElementById("approvalsBtn").click()},
     {name:"/fluxos", description:"Abrir fluxos personalizados", run:()=>document.getElementById("workflowsBtn").click()},
     {name:"/memorias", description:"Abrir memórias e linha do tempo", allowed:()=>Boolean(currentPermissions.memory_access), run:()=>openSettings()},
     {name:"/contexto", description:"Mostrar ou ocultar o painel de contexto", allowed:()=>Boolean(currentPermissions.context_panel), run:()=>contextButton.click()},
     {name:"/modelo", description:"Escolher modelo e nível de raciocínio", run:()=>modelTrigger.click()},
-    {name:"/anexar", description:"Escolher um arquivo ou imagem para revisar", run:()=>attachmentInput.click()},
-    {name:"/integracoes", description:"Ver serviços disponíveis", run:()=>document.getElementById("extensionsBtn").click()},
+    {name:"/anexar", description:"Escolher arquivos ou pastas para revisar", run:()=>document.getElementById("attachBtn").click()},
+    {name:"/pdf", description:"Converter anexos: /pdf nome-do-arquivo ou /pdf todos", argument:true, run:args=>attachmentManager.handle("/pdf " + args)},
+    {name:"/diagnostico", description:"Explicar o último problema observado nesta sessão", run:()=>explainProblem("/diagnostico",true)},
+    {name:"/integracoes", description:"Ver serviços disponíveis", run:openExtensions},
     {name:"/ramificar", description:"Criar uma ramificação da conversa", run:()=>document.getElementById("branchChatBtn").click()},
     {name:"/limpar", description:"Limpar somente a visualização atual", run:()=>{
       log.innerHTML = "";
@@ -3016,6 +3049,8 @@
   }
 
   async function sendOneMessage(text){
+    if(explainProblem(text)) return;
+    if(await attachmentManager.handle(text)) return;
     thinking = true;
     haloEl.classList.add("active");
     setStage("Analisando a solicitação…");
@@ -3027,9 +3062,20 @@
     });
 
     const pending = addMessage("assistant", "…");
+    const sentContexts = pendingContexts;
+    const sentImages = pendingImages;
+    const sentChat = currentChatId;
+    const sentMode = currentMode;
+    let received = false;
 
     try{
-      const data = await askAI(text);
+      // askAI snapshots the payload synchronously; detach only that batch.
+      const request = askAI(text);
+      pendingContexts = [];
+      pendingImages = [];
+      renderApprovedContexts();
+      const data = await request;
+      received = true;
       const reply = data.reply || "";
       currentChatId = data.chat_id;
       contextChatTitle.textContent = data.chat_title || contextChatTitle.textContent;
@@ -3041,9 +3087,6 @@
         sender:currentMode === "shared" ? "Oráculo" : ""
       });
       await rendered.typingDone;
-      pendingContexts = [];
-      pendingImages = [];
-      renderApprovedContexts();
       if(currentMode === "temporary"){
         temporaryHistory.push(
           {role:"user", content:text},
@@ -3062,8 +3105,13 @@
         window.setTimeout(()=>loadMemories().catch(()=>{}), 1800);
       }
     }catch(err){
+      if(!received && currentChatId === sentChat && currentMode === sentMode){
+        if(!pendingContexts.length) pendingContexts = sentContexts;
+        if(!pendingImages.length) pendingImages = sentImages;
+        renderApprovedContexts();
+      }
       setOnline(false);
-      pending.parentElement.remove();
+      pending.parentElement?.remove();
       addMessage("system", "Não foi possível obter resposta: " + err.message);
     }finally{
       window.clearTimeout(stageContext);
@@ -3091,7 +3139,7 @@
 
   form.addEventListener("submit", e=>{
     e.preventDefault();
-    const text = inputField.value.trim();
+    const text = inputField.value.trim() || (pendingImages.length ? "Descreva esta imagem." : "");
     if(!text) return;
     inputField.value = "";
     saveDraft();

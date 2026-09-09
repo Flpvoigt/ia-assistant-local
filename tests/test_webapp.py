@@ -70,6 +70,9 @@ def test_chat_isolation_and_owner_audit(tmp_path):
 
     try:
         with httpx.Client(base_url=base_url, trust_env=False) as will:
+            assert will.get("/api/usage").status_code == 401
+            assert will.post("/api/admin/release/prepare", json={"notes": ["Teste"]}).status_code == 403
+            assert will.post("/api/attachments/pdf", json={}).status_code == 403
             login = will.post(
                 "/api/login",
                 json={"username": "will", "password": credentials["will"]},
@@ -83,10 +86,20 @@ def test_chat_isolation_and_owner_audit(tmp_path):
                 },
             )
             assert changed.status_code == 200
+            assert will.post("/api/admin/release/publish", json={"confirmed": True}).status_code == 403
+            pdf = will.post("/api/attachments/pdf", json={
+                "name": "teste.txt", "mime_type": "text/plain", "data": "T2xh"
+            })
+            assert pdf.status_code == 200
+            assert pdf.json()["data"].startswith("JVBER")
+            assert pdf.json()["sent_to_ai"] is False
             chat = will.post("/api/chat", json={"message": "Olá", "chat_id": None})
             assert chat.status_code == 200
             chat_id = chat.json()["chat_id"]
             assert len(will.get("/api/chats").json()["chats"]) == 1
+            own_usage = will.get("/api/usage").json()
+            assert own_usage["requests_24h"] == 1
+            assert own_usage["remaining"] is None
             assert will.get("/api/admin/chats").status_code == 403
 
         with httpx.Client(base_url=base_url, trust_env=False) as felipe:
@@ -95,6 +108,7 @@ def test_chat_isolation_and_owner_audit(tmp_path):
                 json={"username": "felipe", "password": credentials["felipe"]},
             )
             assert login.json()["user"]["role"] == "owner"
+            assert felipe.get("/api/usage").json()["requests_24h"] == 0
             audit = felipe.get("/api/admin/chats")
             assert audit.status_code == 200
             assert audit.json()["chats"][0]["username"] == "will"

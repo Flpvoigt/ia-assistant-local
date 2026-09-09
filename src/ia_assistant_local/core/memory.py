@@ -618,6 +618,17 @@ class MemoryStore:
                 (user_id, model, int(success)),
             )
 
+    def user_usage(self, user_id: int) -> dict:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT COUNT(*) AS requests_24h, "
+                "COALESCE(SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END), 0) AS errors_24h "
+                "FROM usage_events WHERE user_id = ? "
+                "AND created_at >= unixepoch('now', '-1 day')",
+                (user_id,),
+            ).fetchone()
+        return {**dict(row), "remaining": None}
+
     def health_summary(self) -> dict:
         with self._connect() as connection:
             connection.execute("SELECT 1").fetchone()

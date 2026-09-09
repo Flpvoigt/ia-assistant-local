@@ -1,0 +1,172 @@
+/* Profile and companion: scoped styles keep the chat layout independent. */
+.sidebar-account{display:block;position:relative}
+.chat-sidebar{height:100dvh;min-height:0;overflow:hidden;box-sizing:border-box}
+.chat-sidebar>.sidebar-head,.chat-sidebar>.sidebar-account{flex:0 0 auto}
+.sidebar-scroll{flex:1 1 0;min-height:0;overflow-x:hidden;overflow-y:auto;display:flex;flex-direction:column;gap:6px;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#51415e transparent;padding-right:3px}
+.sidebar-scroll>*{flex-shrink:0}
+.sidebar-scroll .chat-list{flex:0 0 auto;overflow:visible}
+.sidebar-scroll #searchBtn{grid-column:1/-1}
+.sidebar-account.is-floating{position:fixed;left:18px;top:62px;z-index:39;width:52px;padding:3px;border:1px solid #ffffff12;border-radius:15px;background:#141119;box-shadow:0 8px 24px #0003}
+.sidebar-account.is-floating .user-details,.sidebar-account.is-floating #profileTrigger>span{display:none}
+.sidebar-account.is-floating #profileTrigger{padding:6px;justify-content:center}
+.profile-menu{max-height:calc(100dvh - 16px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:#51415e transparent}
+.admin-shortcuts{grid-template-columns:1fr}
+.context-sidebar{overflow-y:auto;min-height:0;overscroll-behavior:contain}
+.context-sidebar>*{flex-shrink:0}
+#profileTrigger{display:flex;align-items:center;gap:10px;width:100%;padding:7px;border:0;border-radius:12px;background:transparent;color:var(--text);text-align:left;cursor:pointer}
+#profileTrigger .user-details{flex:1}
+#profileTrigger:hover,#profileTrigger[aria-expanded=true]{background:rgba(255,255,255,.055)}
+.profile-menu{position:fixed;z-index:75;width:290px;max-width:calc(100vw - 16px);padding:8px;border:1px solid #3b3a40;border-radius:20px;background:linear-gradient(145deg,#2a292d,#232226);color:#eee;box-shadow:0 16px 50px #0007;transform-origin:bottom left;animation:profile-in .16s ease-out}
+.profile-menu header{padding:10px 12px 14px;border-bottom:1px solid #ffffff16;margin-bottom:7px}
+.profile-menu header strong,.profile-menu header small{display:block}
+.profile-menu header small{color:#aaa5b2;font-size:12px;margin-top:4px}
+.profile-menu button{display:flex;align-items:center;gap:12px;width:100%;min-height:40px;padding:9px 12px;border:0;border-radius:9px;background:transparent;color:#e8e5eb;text-align:left;cursor:pointer;font-size:13px}
+.profile-menu button:hover,.profile-menu button:focus-visible{background:#ffffff0c}
+.profile-menu svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:#c0bac9;flex:none}
+.profile-menu .menu-label{flex:1}
+.profile-menu kbd{font:10px var(--font);color:#918a99}
+.profile-dialog{position:fixed;inset:0;margin:auto;width:min(500px,calc(100vw - 24px));max-height:85dvh;overflow:auto;padding:24px;border:1px solid #403c49;border-radius:20px;background:#1c1b21;color:#f0edf5;box-shadow:0 28px 90px #0008;color-scheme:dark}
+.profile-dialog::backdrop{background:#050409aa;backdrop-filter:blur(6px)}
+.profile-dialog h2{margin:0 32px 18px 0;font-size:18px;letter-spacing:0}
+.profile-dialog h3{margin:22px 0 10px;font-size:14px}
+.profile-dialog p{color:#b4adbf;font-size:13px;line-height:1.6}
+.profile-dialog .dialog-close{position:absolute;right:14px;top:13px;width:32px;height:32px;border:0;border-radius:8px;color:#bbb;background:transparent;font-size:22px;cursor:pointer}
+.profile-dialog .dialog-close:hover{background:#ffffff0b;color:#fff}
+.profile-dialog .profile-toggle{display:flex;align-items:center;gap:10px;margin:14px 0;font-size:13px}
+.profile-dialog input[type=checkbox]{accent-color:#a78bfa;width:16px;height:16px}
+.profile-dialog input:not([type=checkbox]),.profile-dialog textarea{display:block;width:100%;padding:11px 12px;margin:8px 0;border:1px solid #45404f;border-radius:10px;background:#111015;color:#eee;font:13px/1.5 var(--font)}
+.profile-dialog textarea{min-height:135px;resize:vertical}
+.profile-dialog label{font-size:12px;color:#c8c1d1}
+.profile-dialog .profile-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.profile-dialog .profile-actions .btn{flex:1;min-width:120px}
+.profile-dialog .profile-status{font-size:12px;color:#c2a7ef;min-height:18px;margin-top:12px}
+.profile-usage{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.profile-usage article{padding:17px;border-radius:12px;background:#ffffff06;border:1px solid #ffffff0b}
+.profile-usage strong{display:block;font-size:27px;font-weight:600}
+.profile-usage span{font-size:11px;color:#a6a0af}
+@keyframes profile-in{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}
+.oracle-pet{position:fixed;top:0;left:0;width:76px;height:86px;z-index:38;will-change:transform;pointer-events:none}
+.oracle-pet .pet-body{width:76px;height:86px;border:0;padding:0;background:transparent;color:#e9e4f5;cursor:grab;touch-action:none;user-select:none;pointer-events:auto;border-radius:30px}
+.oracle-pet .pet-body:active{cursor:grabbing}
+.oracle-pet .pet-body:focus-visible{outline:2px solid #bda2ff;outline-offset:2px}
+.oracle-pet svg{display:block;width:76px;height:86px;overflow:visible;filter:drop-shadow(0 3px 4px #0004)}
+.oracle-pet .pet-facing{transform-origin:38px 44px;transition:transform .18s ease}
+.oracle-pet[data-direction=left] .pet-facing{transform:scaleX(-1)}
+.oracle-pet .pet-arm-left{transform-origin:20px 42px}
+.oracle-pet .pet-arm-right{transform-origin:56px 42px}
+.oracle-pet .pet-leg-left{transform-origin:29px 65px}
+.oracle-pet .pet-leg-right{transform-origin:47px 65px}
+.oracle-pet .pet-eyes{transform-origin:38px 37px}
+.oracle-pet .pet-shadow{opacity:.22}
+.oracle-pet .pet-dismiss{position:absolute;right:-6px;top:-5px;width:20px;height:20px;padding:0;border:1px solid #ffffff20;border-radius:50%;background:#27232e;color:#cec5d9;font-size:14px;opacity:0;pointer-events:none;cursor:pointer}
+.oracle-pet:hover .pet-dismiss,.oracle-pet:focus-within .pet-dismiss{opacity:1;pointer-events:auto}
+.oracle-pet .pet-thought{position:absolute;left:52px;top:-8px;color:#baa8d8;font:11px var(--mono);opacity:0;pointer-events:none;white-space:nowrap}
+.oracle-pet[data-state=walk] .pet-figure{animation:pet-step .4s ease-in-out infinite}
+.oracle-pet[data-state=walk] .pet-leg-left,.oracle-pet[data-state=climb] .pet-arm-left{animation:pet-limb .45s ease-in-out infinite alternate}
+.oracle-pet[data-state=walk] .pet-leg-right,.oracle-pet[data-state=climb] .pet-arm-right{animation:pet-limb .45s ease-in-out infinite alternate-reverse}
+.oracle-pet[data-state=walk] .pet-arm-right{animation:pet-limb .45s ease-in-out infinite alternate}
+.oracle-pet[data-state=walk] .pet-arm-left{animation:pet-limb .45s ease-in-out infinite alternate-reverse}
+.oracle-pet[data-state=climb] .pet-leg-left{animation:pet-limb .5s ease-in-out infinite alternate}
+.oracle-pet[data-state=climb] .pet-leg-right{animation:pet-limb .5s ease-in-out infinite alternate-reverse}
+.oracle-pet[data-state=climb] .pet-shadow,.oracle-pet[data-state=hang] .pet-shadow,.oracle-pet[data-state=drag] .pet-shadow{opacity:0}
+.oracle-pet[data-state=hang] .pet-arm-right{transform:rotate(-145deg)}
+.oracle-pet[data-state=hang] .pet-figure{animation:pet-sway 1.8s ease-in-out infinite}
+.oracle-pet[data-state=sit] .pet-leg-left,.oracle-pet[data-state=sleep] .pet-leg-left,.oracle-pet[data-state=think] .pet-leg-left{transform:translate(-2px,-5px) rotate(-68deg)}
+.oracle-pet[data-state=sit] .pet-leg-right,.oracle-pet[data-state=sleep] .pet-leg-right,.oracle-pet[data-state=think] .pet-leg-right{transform:translate(2px,-5px) rotate(68deg)}
+.oracle-pet[data-state=sleep] .pet-eyes{transform:scaleY(.15)}
+.oracle-pet[data-state=sleep] .pet-thought{opacity:1;animation:pet-snooze 2.8s ease-in-out infinite}
+.oracle-pet[data-state=sleep] .pet-figure{animation:pet-breathe 2.8s ease-in-out infinite}
+.oracle-pet[data-state=wave] .pet-arm-right{animation:pet-wave .32s ease-in-out 4 alternate}
+.oracle-pet[data-state=stretch] .pet-arm-left{transform:rotate(140deg)}
+.oracle-pet[data-state=stretch] .pet-arm-right{transform:rotate(-140deg)}
+.oracle-pet[data-state=stretch] .pet-figure{animation:pet-stretch 1.1s ease-in-out 1}
+.oracle-pet[data-state=hop] .pet-leg-left{transform:rotate(20deg)}
+.oracle-pet[data-state=hop] .pet-leg-right{transform:rotate(-20deg)}
+.oracle-pet[data-state=drag] .pet-arm-left{transform:rotate(70deg)}
+.oracle-pet[data-state=drag] .pet-arm-right{transform:rotate(-70deg)}
+.oracle-pet[data-state=drag] .pet-leg-left{transform:rotate(18deg)}
+.oracle-pet[data-state=drag] .pet-leg-right{transform:rotate(-18deg)}
+.oracle-pet[data-state=think] .pet-eyes{animation:pet-look 2s ease-in-out infinite}
+.oracle-pet[data-state=think] .pet-thought{opacity:1}
+.oracle-pet.is-paused *{animation-play-state:paused!important}
+@keyframes pet-step{50%{transform:translateY(-2px)}}
+@keyframes pet-limb{from{transform:rotate(-22deg)}to{transform:rotate(22deg)}}
+@keyframes pet-wave{from{transform:rotate(-100deg)}to{transform:rotate(-155deg)}}
+@keyframes pet-sway{50%{transform:translateX(2px) rotate(3deg)}}
+@keyframes pet-breathe{50%{transform:translateY(-1px)}}
+@keyframes pet-snooze{0%,100%{transform:translateY(0);opacity:.45}50%{transform:translateY(-5px);opacity:.9}}
+@keyframes pet-stretch{50%{transform:translateY(-5px)}}
+@keyframes pet-look{50%{transform:translateX(2px)}}
+@media(prefers-reduced-motion:reduce){.profile-menu,.oracle-pet *{animation:none!important;transition:none!important}}
+.attachment-row{display:flex;align-items:center;gap:8px;margin:4px 0}
+.attachment-row .btn{min-width:0;flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#attachmentOverlay .modal{max-height:90dvh;overflow-y:auto}
+#attachmentNotice{overflow-wrap:anywhere}
+#attachmentNotice:empty{display:none}
+.drop-active::after{content:"Solte arquivos ou uma pasta para revisar";position:fixed;inset:12px;border:2px dashed #a494d6;border-radius:18px;background:#12101bd9;z-index:150;display:grid;place-items:center;color:#eee;font-size:20px;pointer-events:none}
+#inputForm{display:grid;grid-template-columns:36px minmax(0,1fr) 48px;gap:8px;border-radius:24px}
+#composerAttachments{grid-column:1/-1;display:flex;align-items:flex-start;flex-wrap:wrap;gap:10px;max-height:180px;overflow-y:auto;padding:4px 2px 6px}
+.attachment-thumbnail{position:relative;width:86px;height:86px;flex:none}
+.attachment-thumbnail img{width:100%;height:100%;object-fit:cover;border:1px solid #ffffff26;border-radius:14px;display:block}
+.attachment-thumbnail button{position:absolute;right:4px;top:4px;width:22px;height:22px;border:0;border-radius:50%;background:#f2f0f5;color:#201b28;cursor:pointer;font-size:18px;line-height:1}
+#composerAttachments .context-chip{max-width:240px;background:#ffffff09;border:1px solid #ffffff18;padding:10px;border-radius:12px}
+.attachment-ready{flex-basis:100%;font-size:11px;color:var(--text-dim)}
+#attachmentOverlay .modal{width:min(600px,95vw)!important}
+.attachment-limits{font-size:12px;color:var(--text-dim);margin:14px 0}
+.attachment-limits summary{cursor:pointer}
+.attachment-hint{font-size:12px;color:var(--text-dim);margin:14px 0}
+@media(max-width:500px){#inputForm{grid-template-columns:30px minmax(0,1fr) 44px;padding:12px}.attachment-thumbnail{width:72px;height:72px}}
+.effort-fill{transition:background .25s ease}
+.composer.max-effort .effort-track::after{animation:effortSweep 2.8s ease-in-out infinite}
+.composer.max-effort .effort-stars{animation:effortIgnition 2.8s ease-in-out infinite alternate}
+@media(prefers-reduced-motion:reduce){
+  .effort-fill{transition:none}
+  .composer.max-effort .effort-track::after,.composer.max-effort .effort-stars{animation:none}
+}
+.profile-dialog{scrollbar-width:thin;scrollbar-color:#615c6e transparent}
+.profile-dialog.settings-mode[open]{display:flex;flex-direction:column;width:min(720px,calc(100vw - 24px));height:min(610px,88dvh);max-height:88dvh;overflow:hidden;box-sizing:border-box}
+.settings-mode #profileDialogBody{min-height:0;display:flex;flex-direction:column;flex:1}
+.settings-mode #profileAccountInfo{margin:0 0 16px;font-size:12px}
+.settings-nav{display:flex;gap:6px;padding-bottom:14px;flex-wrap:wrap;border-bottom:1px solid #ffffff12}
+.settings-nav button{border:0;border-radius:9px;padding:9px 12px;background:transparent;color:#aaa4b7;font:inherit;font-size:12px;cursor:pointer}
+.settings-nav button[aria-pressed=true]{background:#a28be51c;color:#e1d6ff}
+.settings-content{overflow-y:auto;min-height:0;padding:4px 10px 14px 0;scrollbar-width:thin;scrollbar-color:#615c6e transparent;overscroll-behavior:contain}
+.profile-dialog::-webkit-scrollbar,.settings-content::-webkit-scrollbar{width:5px}
+.profile-dialog::-webkit-scrollbar-thumb,.settings-content::-webkit-scrollbar-thumb{background:#615c6e;border-radius:9px}
+.profile-dialog::-webkit-scrollbar-button,.settings-content::-webkit-scrollbar-button{display:none}
+.setting-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 0;border-bottom:1px solid #ffffff0c}
+.setting-row select{max-width:55%;padding:9px;border:1px solid #494353;background:#18161e;color:#e8e1f1;border-radius:8px;color-scheme:dark}
+.settings-content input{box-sizing:border-box}
+.settings-content section>h3{margin-top:18px}
+body .core-zone,body .chat-zone,body .composer{width:min(100%,var(--chat-content-width,1000px))}
+body .msg.user .bubble,body .msg.assistant .bubble{font-size:var(--chat-text-size,16px)}
+body.layout-compact .msg{margin-block:2px}
+body.layout-compact .msg .bubble{padding-top:7px;padding-bottom:7px}
+body.layout-quiet #stars,body.layout-quiet .nebula{visibility:hidden}
+body.layout-still .msg{opacity:1;transform:none}
+body.layout-still *,body.layout-still *::before,body.layout-still *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+body.layout-still #stars{visibility:hidden}
+@media(max-width:480px){.settings-nav button{padding:8px;font-size:11px}.profile-dialog.settings-mode{padding:18px}.setting-row{align-items:flex-start;flex-direction:column}.setting-row select{max-width:100%;width:100%}}
+.release-dialog{width:min(680px,92vw);max-height:88dvh;box-sizing:border-box;overflow:auto;padding:28px;background:#15131d;color:#eee;border:1px solid #ffffff20;border-radius:24px;color-scheme:dark;scrollbar-width:thin}
+.release-dialog::backdrop{background:#040309cc;backdrop-filter:blur(12px)}
+.release-dialog header{display:flex;align-items:center;justify-content:space-between}
+.release-dialog h2{font-size:24px;letter-spacing:-.5px;margin:10px 0}
+.release-dialog p,.release-dialog label{font-size:13px;line-height:1.6;color:#bdb6cd}
+.release-dialog textarea{width:100%;box-sizing:border-box;background:#0d0b12;color:#ddd;border:1px solid #494052;border-radius:12px;padding:12px;resize:vertical;margin:10px 0}
+.release-dialog pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;font-size:12px}
+.release-close,.release-skip{background:transparent;border:0;color:#bdb6cd;cursor:pointer;padding:8px}
+.release-welcome{position:fixed;width:min(840px,94vw);height:min(590px,90dvh);padding:30px;background:radial-gradient(ellipse at 50% 45%,#35224c,#100e18 70%)}
+.release-skip{position:absolute;right:18px;top:16px;z-index:3;font-size:12px}
+.release-film{height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;position:relative;overflow:hidden}
+.release-core{width:86px;height:86px;border-radius:50%;background:radial-gradient(circle at 30% 25%,#fff,#b8a4ee 20%,#693f9f 60%,#2a1846);box-shadow:0 0 70px #a182d877;animation:releaseCore 7s ease both;margin-bottom:50px}
+.release-orbit{position:absolute;width:230px;height:230px;top:18px;border:1px solid #b7a1d244;border-radius:50%;box-shadow:0 0 0 25px #aa91ce08,0 0 0 60px #aa91ce05;animation:releaseOrbit 7s ease both}
+.release-film .release-brand{font-size:clamp(30px,7vw,62px);letter-spacing:.18em;color:#eee;animation:releaseTitle 7s ease both}
+.release-kicker{font-size:10px!important;letter-spacing:3px;color:#bda4df!important}
+.release-version{font-size:25px!important;color:#d3bdf5!important;margin:4px;animation:releaseTitle 7s ease both}
+.release-caption{animation:releaseTitle 7s ease both}
+.release-guide li{padding:14px 12px;margin:8px 0;border-bottom:1px solid #ffffff13;color:#d0c7dd;font-size:14px;line-height:1.5}
+.release-guide ol{padding-left:22px}.release-local{font-size:11px!important}
+@keyframes releaseCore{0%{opacity:0;transform:scale(.1);filter:blur(20px)}25%{opacity:1;transform:scale(1.15);filter:blur(0)}55%,100%{transform:scale(1)}}
+@keyframes releaseOrbit{0%{opacity:0;transform:scale(.3) rotateX(70deg)}35%{opacity:1;transform:scale(1.2) rotateX(0deg)}100%{opacity:.3;transform:scale(1.5) rotateX(55deg)}}
+@keyframes releaseTitle{0%,30%{opacity:0;transform:translateY(20px);filter:blur(10px)}65%,100%{opacity:1;transform:none;filter:blur(0)}}
+@media(prefers-reduced-motion:reduce){.release-welcome *{animation:none!important}}

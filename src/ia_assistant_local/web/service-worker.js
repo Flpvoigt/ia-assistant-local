@@ -1,5 +1,5 @@
-const SHELL = "oraculo-shell-v2";
-const ASSETS = ["/", "/manifest.webmanifest", "/icon.svg"];
+const SHELL = "oraculo-shell-v12";
+const ASSETS = ["/", "/manifest.webmanifest", "/icon.svg", "/profile.js", "/mascot.js", "/attachments-ui.js", "/release-ui.js", "/desktop-ui.css"];
 self.addEventListener("install", event => event.waitUntil(caches.open(SHELL).then(cache => cache.addAll(ASSETS))));
 self.addEventListener("activate", event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== SHELL).map(key => caches.delete(key))))));
 self.addEventListener("fetch", event => {

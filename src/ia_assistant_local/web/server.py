@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import inspect
 import json
 import re
@@ -20,6 +21,8 @@ from ..core.actions import command_preview, execute_command, search_folder_conte
 from ..core.attachments import extract_attachment, validate_image
 from ..core.config import PROJECT_ROOT, Settings
 from ..core.memory import PERMISSION_LABELS, MemoryStore
+from ..core.pdf_export import convert_to_pdf
+from ..core.releases import prepare_release, publish_release, release_info
 from ..core.updater import apply_update, update_status
 from ..integrations.extensions import extension_catalog
 from ..integrations.home_assistant import HomeAssistantClient
@@ -190,6 +193,11 @@ class AssistantHandler(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
         static_files = {
+            "/profile.js": ("profile.js", "application/javascript; charset=utf-8"),
+            "/release-ui.js": ("release-ui.js", "application/javascript; charset=utf-8"),
+            "/attachments-ui.js": ("attachments-ui.js", "application/javascript; charset=utf-8"),
+            "/mascot.js": ("mascot.js", "application/javascript; charset=utf-8"),
+            "/desktop-ui.css": ("desktop-ui.css", "text/css; charset=utf-8"),
             "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
             "/service-worker.js": ("service-worker.js", "application/javascript; charset=utf-8"),
             "/icon.svg": ("icon.svg", "image/svg+xml"),
@@ -212,6 +220,20 @@ class AssistantHandler(BaseHTTPRequestHandler):
         if path == "/api/me":
             try:
                 self._send_json(200, {"user": self._require_user()})
+            except PermissionError as exc:
+                self._send_json(401, {"error": str(exc)})
+            return
+        if path == "/api/release":
+            try:
+                self._require_user()
+                self._send_json(200, release_info(PROJECT_ROOT))
+            except PermissionError as exc:
+                self._send_json(401, {"error": str(exc)})
+            return
+        if path == "/api/usage":
+            try:
+                user = self._require_user()
+                self._send_json(200, self.server.memory.user_usage(user["id"]))
             except PermissionError as exc:
                 self._send_json(401, {"error": str(exc)})
             return
@@ -447,6 +469,15 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 created = self.server.memory.add_memory(user["id"], str(payload.get("content", "")))
                 self._send_json(201 if created else 200, {"created": created})
                 return
+            if self.path == "/api/attachments/pdf":
+                self._require_user()
+                payload = self._read_json()
+                result = convert_to_pdf(str(payload.get("name", "anexo")),
+                                        str(payload.get("mime_type", "")),
+                                        str(payload.get("data", "")))
+                self._send_json(200, {"data": base64.b64encode(result).decode("ascii"),
+                                      "sent_to_ai": False})
+                return
             if self.path == "/api/attachments/extract":
                 self._require_user()
                 payload = self._read_json()
@@ -456,6 +487,20 @@ class AssistantHandler(BaseHTTPRequestHandler):
                     str(payload.get("data", "")),
                 )
                 self._send_json(200, {"attachment": result, "sent_to_ai": False})
+                return
+            if self.path in {"/api/admin/release/prepare", "/api/admin/release/publish"}:
+                user = self._require_user()
+                self._require_owner(user)
+                if user.get("username") != "felipe" or user.get("must_change_password"):
+                    raise PermissionError("Lançamento exclusivo da conta Felipe com senha definitiva.")
+                payload = self._read_json()
+                if self.path.endswith("/prepare"):
+                    result = prepare_release(PROJECT_ROOT, user["id"], payload.get("notes", []))
+                else:
+                    if payload.get("confirmed") is not True:
+                        raise ValueError("Confirme a revisão antes de publicar.")
+                    result = publish_release(PROJECT_ROOT, user["id"], str(payload.get("token", "")))
+                self._send_json(200, result)
                 return
             if self.path == "/api/admin/update/prepare":
                 user = self._require_user()
@@ -555,6 +600,21 @@ class AssistantHandler(BaseHTTPRequestHandler):
             self._send_json(status, {"error": str(exc)})
         except (json.JSONDecodeError, TypeError, ValueError) as exc:
             self._send_json(400, {"error": str(exc)})
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 429:
+                retry = exc.response.headers.get("retry-after", "")
+                delay = int(retry) if retry.isdecimal() and len(retry) < 10 else None
+                wait = f" Aguarde {delay} segundos antes de tentar novamente." if delay else (
+                    " Aguarde a renovação do limite e tente novamente."
+                )
+                self._send_json(429, {
+                    "error": "A Groq atingiu o limite de uso para esta solicitação." + wait
+                             + " A conversão /pdf continua disponível porque é local.",
+                    "code": "groq_rate_limit", "retry_after": delay,
+                })
+            else:
+                self._send_json(502, {"error": "A Groq não conseguiu processar a solicitação "
+                                              f"(HTTP {exc.response.status_code})."})
         except httpx.HTTPError as exc:
             self._send_json(502, {"error": f"Erro no Groq: {exc}"})
         except RuntimeError as exc:
@@ -664,8 +724,8 @@ class AssistantHandler(BaseHTTPRequestHandler):
             return
         payload = self._read_json()
         message = payload.get("message", "")
-        if not isinstance(message, str) or not message.strip():
-            raise ValueError("Mensagem vazia.")
+        if not isinstance(message, str):
+            raise TypeError("A mensagem deve ser texto.")
         message = message.strip()
         mode = str(payload.get("mode", "private"))
         if mode not in {"private", "temporary", "shared"}:
@@ -681,6 +741,10 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 approved_images.append(validate_image(image))
         if approved_images:
             model = VISION_MODEL
+            if not message:
+                message = "Descreva esta imagem."
+        if not message:
+            raise ValueError("Envie uma mensagem ou uma imagem.")
         raw_project_id = payload.get("project_id")
         project_id = (
             int(raw_project_id) if raw_project_id not in {None, ""} and mode == "private" else None
@@ -728,11 +792,13 @@ class AssistantHandler(BaseHTTPRequestHandler):
         approved_context: list[str] = []
         raw_context = payload.get("approved_context", [])
         if payload.get("context_consent") is True and isinstance(raw_context, list):
-            for item in raw_context[:3]:
+            remaining_context = 60_000
+            for item in raw_context[:50]:
                 if not isinstance(item, dict):
                     continue
                 source = " ".join(str(item.get("source", "Contexto")).split())[:160]
-                content = str(item.get("content", "")).strip()[:4000]
+                content = str(item.get("content", "")).strip()[:min(12_000, remaining_context)]
+                remaining_context -= len(content)
                 if content:
                     approved_context.append(f"Contexto autorizado ({source}):\n{content}")
         explicit = EXPLICIT_MEMORY.match(message) if memory_enabled else None
@@ -834,6 +900,8 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 return reply, candidate, candidate != primary_model
             except (httpx.HTTPError, RuntimeError, TypeError, ValueError) as exc:
                 self.server.memory.record_usage(user_id, candidate, False)
+                if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429:
+                    raise
                 last_error = exc
         if last_error is not None:
             raise last_error
