@@ -63,7 +63,7 @@ def test_rejects_changes_after_review_and_wrong_user(release_repo):
 
 def test_blocks_secrets_and_staging(release_repo):
     root = release_repo
-    (root / "README.md").write_text("gsk_" + "a"*25)
+    (root / "README.md").write_text("gsk_" + "a" * 25)
     with pytest.raises(ValueError, match="segredo"):
         prepare_release(root, 1, ["Teste"])
     (root / "README.md").write_text("Safe\n")

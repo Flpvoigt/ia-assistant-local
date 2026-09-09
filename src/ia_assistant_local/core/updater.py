@@ -18,12 +18,24 @@ def update_status(root: Path, check_remote: bool = False) -> dict[str, object]:
     branch = _git(root, "branch", "--show-current") or "detached"
     current = _git(root, "rev-parse", "--short", "HEAD")
     dirty = bool(_git(root, "status", "--porcelain"))
-    result: dict[str, object] = {"branch": branch, "current": current, "dirty": dirty, "remote_checked": False, "update_available": None}
+    result: dict[str, object] = {
+        "branch": branch,
+        "current": current,
+        "dirty": dirty,
+        "remote_checked": False,
+        "update_available": None,
+    }
     if check_remote:
         remote = _git(root, "ls-remote", "origin", f"refs/heads/{branch}")
         remote_sha = remote.split()[0] if remote else ""
         local_sha = _git(root, "rev-parse", "HEAD")
-        result.update({"remote_checked": True, "remote": remote_sha[:7], "update_available": bool(remote_sha and remote_sha != local_sha)})
+        result.update(
+            {
+                "remote_checked": True,
+                "remote": remote_sha[:7],
+                "update_available": bool(remote_sha and remote_sha != local_sha),
+            }
+        )
     return result
 
 
@@ -38,4 +50,10 @@ def apply_update(root: Path, database_path: Path) -> dict[str, object]:
             source.backup(destination)
     _git(root, "pull", "--ff-only", "origin", str(status["branch"]))
     after = _git(root, "rev-parse", "HEAD")
-    return {"ok": True, "before": before[:7], "after": after[:7], "backup": str(backup) if database_path.exists() else None, "restart_required": before != after}
+    return {
+        "ok": True,
+        "before": before[:7],
+        "after": after[:7],
+        "backup": str(backup) if database_path.exists() else None,
+        "restart_required": before != after,
+    }

@@ -35,21 +35,30 @@ def test_image_pdf_and_existing_pdf():
 def test_docx_local_text_and_pdf():
     raw = io.BytesIO()
     with zipfile.ZipFile(raw, "w") as archive:
-        archive.writestr("word/document.xml",
-                        '<w:document xmlns:w="http://schemas.openxmlformats.org/'
-                        'wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>'
-                        'Documento de teste</w:t></w:r></w:p></w:body></w:document>')
+        archive.writestr(
+            "word/document.xml",
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/'
+            'wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>'
+            "Documento de teste</w:t></w:r></w:p></w:body></w:document>",
+        )
     data = encoded(raw.getvalue())
     assert extract_attachment("exemplo.docx", "", data)["content"] == "Documento de teste"
     result = convert_to_pdf("exemplo.docx", "", data)
     assert "Documento de teste" in PdfReader(io.BytesIO(result)).pages[0].extract_text()
 
 
-@pytest.mark.parametrize("name,raw", [
-    ("arquivo.exe", b"not executable"), ("broken.png", b"broken"),
-    ("broken.docx", b"broken"), ("broken.pdf", b"broken"),
-    ("grande.txt", b"x" * 200_001), ("vazio.txt", b" "),
-], ids=["unsupported", "bad-image", "bad-docx", "bad-pdf", "too-large", "empty"])
+@pytest.mark.parametrize(
+    "name,raw",
+    [
+        ("arquivo.exe", b"not executable"),
+        ("broken.png", b"broken"),
+        ("broken.docx", b"broken"),
+        ("broken.pdf", b"broken"),
+        ("grande.txt", b"x" * 200_001),
+        ("vazio.txt", b" "),
+    ],
+    ids=["unsupported", "bad-image", "bad-docx", "bad-pdf", "too-large", "empty"],
+)
 def test_rejects_unsupported_broken_and_oversized_content(name, raw):
     with pytest.raises(ValueError):
         convert_to_pdf(name, "", encoded(raw))

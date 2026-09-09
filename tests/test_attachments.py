@@ -26,5 +26,8 @@ def test_image_validation_only_accepts_safe_data_urls():
 def test_extension_catalog_reports_configuration_state():
     disabled = extension_catalog(False)
     enabled = extension_catalog(True)
-    assert next(item for item in disabled if item["id"] == "home_assistant")["status"] == "setup_required"
+    assert (
+        next(item for item in disabled if item["id"] == "home_assistant")["status"]
+        == "setup_required"
+    )
     assert next(item for item in enabled if item["id"] == "home_assistant")["status"] == "active"

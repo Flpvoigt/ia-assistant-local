@@ -1,4 +1,5 @@
 """Conversão local: sem executar documentos, macros ou buscar recursos externos."""
+
 from __future__ import annotations
 
 import io
@@ -28,7 +29,9 @@ def convert_to_pdf(name: str, mime_type: str, data: str) -> bytes:
         from reportlab.lib.utils import ImageReader
         from reportlab.pdfgen import canvas
     except ImportError as exc:
-        raise RuntimeError("Instale as dependências atualizadas: python -m pip install -r requirements.txt") from exc
+        raise RuntimeError(
+            "Instale as dependências atualizadas: python -m pip install -r requirements.txt"
+        ) from exc
 
     output = io.BytesIO()
     pdf = canvas.Canvas(output, pagesize=A4)
@@ -43,7 +46,7 @@ def convert_to_pdf(name: str, mime_type: str, data: str) -> bytes:
                     picture = ImageOps.exif_transpose(original).convert("RGB")
                     scale = min((width - 80) / picture.width, (height - 80) / picture.height)
                     w, h = picture.width * scale, picture.height * scale
-                    pdf.drawImage(ImageReader(picture), (width-w)/2, (height-h)/2, w, h)
+                    pdf.drawImage(ImageReader(picture), (width - w) / 2, (height - h) / 2, w, h)
         except Exception as exc:
             raise ValueError("Imagem inválida ou grande demais para converter.") from exc
         pdf.showPage()
@@ -56,8 +59,9 @@ def convert_to_pdf(name: str, mime_type: str, data: str) -> bytes:
         page = 0
         y = 0
         for paragraph in text.splitlines():
-            for line in textwrap.wrap(paragraph.expandtabs(4), width=88, replace_whitespace=False,
-                                      drop_whitespace=False) or [""]:
+            for line in textwrap.wrap(
+                paragraph.expandtabs(4), width=88, replace_whitespace=False, drop_whitespace=False
+            ) or [""]:
                 if y < 48:
                     if page:
                         pdf.showPage()

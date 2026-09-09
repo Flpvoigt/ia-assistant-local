@@ -117,8 +117,7 @@ class LocalAgent:
         if images:
             content: list[dict] = [{"type": "text", "text": text}]
             content.extend(
-                {"type": "image_url", "image_url": {"url": image}}
-                for image in images[:3]
+                {"type": "image_url", "image_url": {"url": image}} for image in images[:3]
             )
             messages.append({"role": "user", "content": content})
         else:

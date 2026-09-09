@@ -13,8 +13,24 @@ from pypdf.errors import PyPdfError
 MAX_ATTACHMENT_BYTES = 5_000_000
 MAX_EXTRACTED_CHARS = 12_000
 TEXT_SUFFIXES = {
-    ".txt", ".md", ".csv", ".json", ".yaml", ".yml", ".xml", ".html", ".css",
-    ".js", ".ts", ".py", ".java", ".c", ".cpp", ".h", ".sql", ".log",
+    ".txt",
+    ".md",
+    ".csv",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".xml",
+    ".html",
+    ".css",
+    ".js",
+    ".ts",
+    ".py",
+    ".java",
+    ".c",
+    ".cpp",
+    ".h",
+    ".sql",
+    ".log",
 }
 IMAGE_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
@@ -62,14 +78,26 @@ def extract_attachment(name: str, mime_type: str, data: str) -> dict[str, object
                 if sum(map(len, pages)) >= MAX_EXTRACTED_CHARS:
                     break
         except (PyPdfError, OSError) as exc:
-            raise ValueError("PDF inválido ou protegido; não foi possível extrair o texto.") from exc
+            raise ValueError(
+                "PDF inválido ou protegido; não foi possível extrair o texto."
+            ) from exc
         text = "\n\n".join(pages).strip()[:MAX_EXTRACTED_CHARS]
         if not text:
             raise ValueError("O PDF não contém texto extraível.")
-        return {"name": safe_name, "kind": "text", "content": text, "truncated": len(text) >= MAX_EXTRACTED_CHARS}
+        return {
+            "name": safe_name,
+            "kind": "text",
+            "content": text,
+            "truncated": len(text) >= MAX_EXTRACTED_CHARS,
+        }
     if mime_type.startswith("text/") or suffix in TEXT_SUFFIXES or suffix == ".docx":
         text = document_text(safe_name, raw).strip()
-        return {"name": safe_name, "kind": "text", "content": text[:MAX_EXTRACTED_CHARS], "truncated": len(text) > MAX_EXTRACTED_CHARS}
+        return {
+            "name": safe_name,
+            "kind": "text",
+            "content": text[:MAX_EXTRACTED_CHARS],
+            "truncated": len(text) > MAX_EXTRACTED_CHARS,
+        }
     if mime_type in IMAGE_MIME_TYPES:
         return {"name": safe_name, "kind": "image", "mime_type": mime_type, "size": len(raw)}
     raise ValueError("Formato não permitido. Use PDF, DOCX, texto, código, PNG, JPG ou WebP.")

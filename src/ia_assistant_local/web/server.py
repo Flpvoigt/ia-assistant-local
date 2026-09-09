@@ -472,11 +472,14 @@ class AssistantHandler(BaseHTTPRequestHandler):
             if self.path == "/api/attachments/pdf":
                 self._require_user()
                 payload = self._read_json()
-                result = convert_to_pdf(str(payload.get("name", "anexo")),
-                                        str(payload.get("mime_type", "")),
-                                        str(payload.get("data", "")))
-                self._send_json(200, {"data": base64.b64encode(result).decode("ascii"),
-                                      "sent_to_ai": False})
+                result = convert_to_pdf(
+                    str(payload.get("name", "anexo")),
+                    str(payload.get("mime_type", "")),
+                    str(payload.get("data", "")),
+                )
+                self._send_json(
+                    200, {"data": base64.b64encode(result).decode("ascii"), "sent_to_ai": False}
+                )
                 return
             if self.path == "/api/attachments/extract":
                 self._require_user()
@@ -492,14 +495,18 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 user = self._require_user()
                 self._require_owner(user)
                 if user.get("username") != "felipe" or user.get("must_change_password"):
-                    raise PermissionError("Lançamento exclusivo da conta Felipe com senha definitiva.")
+                    raise PermissionError(
+                        "Lançamento exclusivo da conta Felipe com senha definitiva."
+                    )
                 payload = self._read_json()
                 if self.path.endswith("/prepare"):
                     result = prepare_release(PROJECT_ROOT, user["id"], payload.get("notes", []))
                 else:
                     if payload.get("confirmed") is not True:
                         raise ValueError("Confirme a revisão antes de publicar.")
-                    result = publish_release(PROJECT_ROOT, user["id"], str(payload.get("token", "")))
+                    result = publish_release(
+                        PROJECT_ROOT, user["id"], str(payload.get("token", ""))
+                    )
                 self._send_json(200, result)
                 return
             if self.path == "/api/admin/update/prepare":
@@ -604,17 +611,29 @@ class AssistantHandler(BaseHTTPRequestHandler):
             if exc.response.status_code == 429:
                 retry = exc.response.headers.get("retry-after", "")
                 delay = int(retry) if retry.isdecimal() and len(retry) < 10 else None
-                wait = f" Aguarde {delay} segundos antes de tentar novamente." if delay else (
-                    " Aguarde a renovação do limite e tente novamente."
+                wait = (
+                    f" Aguarde {delay} segundos antes de tentar novamente."
+                    if delay
+                    else (" Aguarde a renovação do limite e tente novamente.")
                 )
-                self._send_json(429, {
-                    "error": "A Groq atingiu o limite de uso para esta solicitação." + wait
-                             + " A conversão /pdf continua disponível porque é local.",
-                    "code": "groq_rate_limit", "retry_after": delay,
-                })
+                self._send_json(
+                    429,
+                    {
+                        "error": "A Groq atingiu o limite de uso para esta solicitação."
+                        + wait
+                        + " A conversão /pdf continua disponível porque é local.",
+                        "code": "groq_rate_limit",
+                        "retry_after": delay,
+                    },
+                )
             else:
-                self._send_json(502, {"error": "A Groq não conseguiu processar a solicitação "
-                                              f"(HTTP {exc.response.status_code})."})
+                self._send_json(
+                    502,
+                    {
+                        "error": "A Groq não conseguiu processar a solicitação "
+                        f"(HTTP {exc.response.status_code})."
+                    },
+                )
         except httpx.HTTPError as exc:
             self._send_json(502, {"error": f"Erro no Groq: {exc}"})
         except RuntimeError as exc:
@@ -684,9 +703,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
                         result = {"ok": True, "output": output}
                     elif approval["kind"] == "project_update":
                         self._require_owner(user)
-                        result = apply_update(
-                            PROJECT_ROOT, self.server.settings.database_path
-                        )
+                        result = apply_update(PROJECT_ROOT, self.server.settings.database_path)
                     else:
                         raise ValueError("Tipo de aprovação desconhecido.")
                     resolved = self.server.memory.resolve_approval(
@@ -797,7 +814,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 if not isinstance(item, dict):
                     continue
                 source = " ".join(str(item.get("source", "Contexto")).split())[:160]
-                content = str(item.get("content", "")).strip()[:min(12_000, remaining_context)]
+                content = str(item.get("content", "")).strip()[: min(12_000, remaining_context)]
                 remaining_context -= len(content)
                 if content:
                     approved_context.append(f"Contexto autorizado ({source}):\n{content}")

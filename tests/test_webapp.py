@@ -71,7 +71,10 @@ def test_chat_isolation_and_owner_audit(tmp_path):
     try:
         with httpx.Client(base_url=base_url, trust_env=False) as will:
             assert will.get("/api/usage").status_code == 401
-            assert will.post("/api/admin/release/prepare", json={"notes": ["Teste"]}).status_code == 403
+            assert (
+                will.post("/api/admin/release/prepare", json={"notes": ["Teste"]}).status_code
+                == 403
+            )
             assert will.post("/api/attachments/pdf", json={}).status_code == 403
             login = will.post(
                 "/api/login",
@@ -86,10 +89,13 @@ def test_chat_isolation_and_owner_audit(tmp_path):
                 },
             )
             assert changed.status_code == 200
-            assert will.post("/api/admin/release/publish", json={"confirmed": True}).status_code == 403
-            pdf = will.post("/api/attachments/pdf", json={
-                "name": "teste.txt", "mime_type": "text/plain", "data": "T2xh"
-            })
+            assert (
+                will.post("/api/admin/release/publish", json={"confirmed": True}).status_code == 403
+            )
+            pdf = will.post(
+                "/api/attachments/pdf",
+                json={"name": "teste.txt", "mime_type": "text/plain", "data": "T2xh"},
+            )
             assert pdf.status_code == 200
             assert pdf.json()["data"].startswith("JVBER")
             assert pdf.json()["sent_to_ai"] is False
@@ -227,8 +233,11 @@ def test_attachment_preview_stays_local(tmp_path):
     memory = MemoryStore(tmp_path / "oraculo.db")
     credentials = dict(memory.bootstrap_admins())
     settings = SimpleNamespace(
-        groq_api_key="secret", groq_model="model", groq_models=("model",),
-        home_assistant_url=None, home_assistant_token=None,
+        groq_api_key="secret",
+        groq_model="model",
+        groq_models=("model",),
+        home_assistant_url=None,
+        home_assistant_token=None,
     )
     server = AssistantServer(("127.0.0.1", 0), DummyAgent(), settings, memory)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
