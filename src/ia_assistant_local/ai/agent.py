@@ -97,6 +97,7 @@ class LocalAgent:
         allowed_tools: frozenset[str] | None = None,
         model: str | None = None,
         reasoning_effort: str | None = None,
+        images: list[str] | None = None,
     ) -> str:
         if not self.api_key:
             raise RuntimeError("GROQ_API_KEY nao configurada no arquivo .env.")
@@ -113,7 +114,15 @@ class LocalAgent:
                 }
             )
         messages.extend((history or [])[-40:])
-        messages.append({"role": "user", "content": text})
+        if images:
+            content: list[dict] = [{"type": "text", "text": text}]
+            content.extend(
+                {"type": "image_url", "image_url": {"url": image}}
+                for image in images[:3]
+            )
+            messages.append({"role": "user", "content": content})
+        else:
+            messages.append({"role": "user", "content": text})
         for _ in range(5):
             message = self._chat(
                 messages,

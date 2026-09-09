@@ -209,6 +209,33 @@ def test_temporary_chat_is_not_saved_and_model_is_selected(tmp_path):
         thread.join(timeout=2)
 
 
+def test_attachment_preview_stays_local(tmp_path):
+    memory = MemoryStore(tmp_path / "oraculo.db")
+    credentials = dict(memory.bootstrap_admins())
+    settings = SimpleNamespace(
+        groq_api_key="secret", groq_model="model", groq_models=("model",),
+        home_assistant_url=None, home_assistant_token=None,
+    )
+    server = AssistantServer(("127.0.0.1", 0), DummyAgent(), settings, memory)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        with httpx.Client(base_url=base_url, trust_env=False) as client:
+            client.post("/api/login", json={"username": "will", "password": credentials["will"]})
+            preview = client.post(
+                "/api/attachments/extract",
+                json={"name": "notes.txt", "mime_type": "text/plain", "data": "c2VncmVkbw=="},
+            )
+            assert preview.status_code == 200
+            assert preview.json()["sent_to_ai"] is False
+            assert client.get("/api/extensions").status_code == 200
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
 def test_project_context_requires_consent_and_model_fallback_continues(tmp_path):
     memory = MemoryStore(tmp_path / "oraculo.db")
     credentials = dict(memory.bootstrap_admins())

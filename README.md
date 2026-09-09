@@ -77,6 +77,30 @@ pesquisa global, painel de saude do sistema e paineis de artefatos para blocos d
 codigo, tabelas e checklists. A lista permitida de modelos pode ser ajustada em
 `GROQ_MODELS`; somente modelos incluidos nela sao aceitos pelo servidor.
 
+Respostas do Oraculo sao exibidas com Markdown seguro: titulos, listas, tabelas,
+links, checklists e blocos de codigo com botao para copiar. O conteudo gerado nao
+e inserido como HTML executavel no navegador.
+
+Arquivos de texto, codigo e PDFs podem ser arrastados ou escolhidos pelo botao de
+anexo. O conteudo e extraido localmente e aparece em uma tela editavel de revisao;
+somente depois da confirmacao ele entra no proximo pedido. PNG, JPG e WebP tambem
+exigem previa e confirmacao e usam o modelo visual `qwen/qwen3.6-27b`. Anexos nao
+sao gravados no historico, e o limite atual e de 5 MB por arquivo e uma imagem por
+pedido.
+
+O painel Extensoes mostra as integracoes implementadas: nucleo local e Home Assistant.
+O Home Assistant permite consultar estados e controlar luzes e tomadas autorizadas;
+aparece como "configuracao necessaria" enquanto faltar sua configuracao.
+
+Felipe tambem possui o painel Atualizacao segura. A verificacao remota e manual; o
+sistema recusa atualizacoes quando existem mudancas locais e cria uma aprovacao
+separada antes de executar `git pull --ff-only`, com backup consistente do banco.
+Depois de aplicar uma versao nova, reinicie o Oraculo quando o painel solicitar.
+
+O projeto inclui manifesto e service worker de PWA. Em `localhost`, navegadores
+compativeis podem oferecer a instalacao no computador. Instalar no celular fora da
+rede local continua dependendo de HTTPS/hospedagem, que nao e configurada aqui.
+
 Depois de cada mensagem, o Oraculo identifica automaticamente fatos e preferencias
 duradouras que possam ajudar no futuro. Pedidos momentaneos e informacoes sensiveis,
 como senhas, tokens, documentos e dados financeiros, nao devem virar memoria.

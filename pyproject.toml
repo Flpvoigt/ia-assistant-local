@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Assistente local seguro para computador e Home Assistant"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["httpx>=0.27,<1"]
+dependencies = ["httpx>=0.27,<1", "pypdf>=5,<7"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "ruff>=0.8,<1"]

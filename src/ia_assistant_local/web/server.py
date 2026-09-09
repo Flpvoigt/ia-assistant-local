@@ -17,14 +17,18 @@ import httpx
 
 from ..ai.agent import LocalAgent
 from ..core.actions import command_preview, execute_command, search_folder_context, validate_folder
+from ..core.attachments import extract_attachment, validate_image
 from ..core.config import PROJECT_ROOT, Settings
 from ..core.memory import PERMISSION_LABELS, MemoryStore
+from ..core.updater import apply_update, update_status
+from ..integrations.extensions import extension_catalog
 from ..integrations.home_assistant import HomeAssistantClient
 from ..integrations.tools import ToolRegistry
 
 HOST = "127.0.0.1"
 PORT = 8765
-MAX_REQUEST_SIZE = 1_000_000
+MAX_REQUEST_SIZE = 12_000_000
+VISION_MODEL = "qwen/qwen3.6-27b"
 COOKIE_NAME = "oraculo_session"
 EXPLICIT_MEMORY = re.compile(
     r"^\s*(?:lembre(?:-se)?(?: de)? que|memorize que|guarde que)\s+(.+?)\s*$",
@@ -155,6 +159,23 @@ class AssistantHandler(BaseHTTPRequestHandler):
             label = PERMISSION_LABELS[permission]
             raise PermissionError(f"Seu usuário não possui permissão para: {label}.")
 
+    @staticmethod
+    def _require_owner(user: dict) -> None:
+        if user.get("role") != "owner":
+            raise PermissionError("Acesso exclusivo do dev-chefe.")
+
+    def _send_static(self, name: str, content_type: str) -> None:
+        body = Path(__file__).with_name(name).read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-cache")
+        if name == "service-worker.js":
+            self.send_header("Service-Worker-Allowed", "/")
+        self._security_headers()
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
@@ -167,6 +188,14 @@ class AssistantHandler(BaseHTTPRequestHandler):
             self._security_headers()
             self.end_headers()
             self.wfile.write(body)
+            return
+        static_files = {
+            "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
+            "/service-worker.js": ("service-worker.js", "application/javascript; charset=utf-8"),
+            "/icon.svg": ("icon.svg", "image/svg+xml"),
+        }
+        if path in static_files:
+            self._send_static(*static_files[path])
             return
         if path == "/api/status":
             user = self.server.memory.current_user(self._session_token())
@@ -309,6 +338,28 @@ class AssistantHandler(BaseHTTPRequestHandler):
             except OSError as exc:
                 self._send_json(503, {"error": f"Banco indisponível: {exc}"})
             return
+        if path == "/api/extensions":
+            try:
+                self._require_user()
+                configured = bool(
+                    self.server.settings.home_assistant_url
+                    and self.server.settings.home_assistant_token
+                )
+                self._send_json(200, {"extensions": extension_catalog(configured)})
+            except PermissionError as exc:
+                self._send_json(401, {"error": str(exc)})
+            return
+        if path == "/api/admin/update/status":
+            try:
+                user = self._require_user()
+                self._require_owner(user)
+                check_remote = parse_qs(parsed.query).get("remote", ["0"])[0] == "1"
+                self._send_json(200, {"update": update_status(PROJECT_ROOT, check_remote)})
+            except PermissionError as exc:
+                self._send_json(403, {"error": str(exc)})
+            except RuntimeError as exc:
+                self._send_json(502, {"error": str(exc)})
+            return
         if path.startswith("/api/chats/"):
             try:
                 user = self._require_user()
@@ -395,6 +446,35 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 payload = self._read_json()
                 created = self.server.memory.add_memory(user["id"], str(payload.get("content", "")))
                 self._send_json(201 if created else 200, {"created": created})
+                return
+            if self.path == "/api/attachments/extract":
+                self._require_user()
+                payload = self._read_json()
+                result = extract_attachment(
+                    str(payload.get("name", "anexo")),
+                    str(payload.get("mime_type", "")),
+                    str(payload.get("data", "")),
+                )
+                self._send_json(200, {"attachment": result, "sent_to_ai": False})
+                return
+            if self.path == "/api/admin/update/prepare":
+                user = self._require_user()
+                self._require_owner(user)
+                status = update_status(PROJECT_ROOT, True)
+                if status["dirty"]:
+                    raise ValueError("Há alterações locais. Faça commit antes de atualizar.")
+                approval = self.server.memory.create_approval(
+                    user["id"],
+                    "project_update",
+                    {
+                        "label": "Atualizar o Oráculo pelo Git com avanço rápido",
+                        "branch": status["branch"],
+                        "current": status["current"],
+                        "remote": status.get("remote"),
+                        "backup_database": True,
+                    },
+                )
+                self._send_json(201, {"approval": approval})
                 return
             if self.path == "/api/projects":
                 user = self._require_user()
@@ -542,6 +622,11 @@ class AssistantHandler(BaseHTTPRequestHandler):
                             allowed=frozenset({tool_name}),
                         )
                         result = {"ok": True, "output": output}
+                    elif approval["kind"] == "project_update":
+                        self._require_owner(user)
+                        result = apply_update(
+                            PROJECT_ROOT, self.server.settings.database_path
+                        )
                     else:
                         raise ValueError("Tipo de aprovação desconhecido.")
                     resolved = self.server.memory.resolve_approval(
@@ -589,6 +674,13 @@ class AssistantHandler(BaseHTTPRequestHandler):
         if model not in self._available_models():
             model = self.server.settings.groq_model
         reasoning_effort = self.server.memory.reasoning_effort(user["id"])
+        approved_images: list[str] = []
+        raw_images = payload.get("approved_images", [])
+        if payload.get("image_consent") is True and isinstance(raw_images, list):
+            for image in raw_images[:1]:
+                approved_images.append(validate_image(image))
+        if approved_images:
+            model = VISION_MODEL
         raw_project_id = payload.get("project_id")
         project_id = (
             int(raw_project_id) if raw_project_id not in {None, ""} and mode == "private" else None
@@ -662,6 +754,10 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 ],
                 "allowed_tools": allowed_tools,
             }
+            if approved_images:
+                if "images" not in inspect.signature(self.server.agent.ask).parameters:
+                    raise RuntimeError("O agente atual não aceita imagens.")
+                ask_kwargs["images"] = approved_images
 
             def request_approval(request: dict) -> bool:
                 if not isinstance(request, dict):
@@ -723,7 +819,8 @@ class AssistantHandler(BaseHTTPRequestHandler):
         self, user_id: int, message: str, primary_model: str, ask_kwargs: dict
     ) -> tuple[str, str, bool]:
         models = [primary_model]
-        models.extend(model for model in self._available_models() if model != primary_model)
+        if not ask_kwargs.get("images"):
+            models.extend(model for model in self._available_models() if model != primary_model)
         last_error: Exception | None = None
         supports_model = "model" in inspect.signature(self.server.agent.ask).parameters
         for candidate in models[:2]:
