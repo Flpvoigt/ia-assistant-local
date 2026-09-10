@@ -1800,6 +1800,12 @@
     updateModelUI();
   }
 
+  window.addEventListener("oraculo:release-published", event=>{
+    loadModels().catch(()=>{});
+    const releaseVersion=document.getElementById("adminReleaseVersion");
+    if(releaseVersion && event.detail?.version) releaseVersion.textContent="Versão atual · "+event.detail.version;
+  });
+
   function effortDetails(){
     return [
       {value:"low", name:"Rápido"},

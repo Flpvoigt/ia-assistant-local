@@ -9,6 +9,8 @@ from ia_assistant_local.web.server import (
     AssistantServer,
     is_internal_details_request,
 )
+from ia_assistant_local.core.config import PROJECT_ROOT
+from ia_assistant_local.core.releases import release_info
 
 
 class DummyAgent:
@@ -223,6 +225,12 @@ def test_temporary_chat_is_not_saved_and_model_is_selected(tmp_path):
             assert client.get("/api/chats").json()["chats"] == []
             assert client.get("/api/memories").json()["memories"] == []
             assert client.get("/api/health").status_code == 200
+            models = client.get("/api/models").json()
+            assert models["version"] == release_info(PROJECT_ROOT)["version"]
+            assert all(
+                item["label"].startswith(f'Oráculo {models["version"]} · ')
+                for item in models["models"]
+            )
     finally:
         server.shutdown()
         server.server_close()

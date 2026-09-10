@@ -39,6 +39,7 @@
         const result=await api("/api/admin/release/publish",{token,confirmed:true});
         status.textContent=result.message+" Versão "+result.version+". Commit "+result.commit.slice(0,8)+".";
         latestRelease={version:result.version,published:true,notes:notes.value.split("\n").filter(line=>line.trim())};
+        window.dispatchEvent(new CustomEvent("oraculo:release-published",{detail:latestRelease}));
         window.setTimeout(()=>{if(user&&latestRelease){dialog.close();dialog.replaceChildren();welcome(latestRelease,true);}},1200);
       }catch(error){status.textContent=error.message+" Confira o estado do Git antes de tentar novamente.";}
       finally{publishing=false;token=null;publish.hidden=true;prepare.disabled=false;notes.disabled=false;}

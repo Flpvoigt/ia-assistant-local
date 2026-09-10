@@ -251,6 +251,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
             try:
                 user = self._require_user()
                 models = self._available_models()
+                current_version = str(release_info(PROJECT_ROOT).get("version", "1.0"))
                 selected = self.server.memory.selected_model(
                     user["id"], self.server.settings.groq_model
                 )
@@ -262,11 +263,12 @@ class AssistantHandler(BaseHTTPRequestHandler):
                         "models": [
                             {
                                 "id": model,
-                                "label": self._model_label(model, index),
+                                "label": self._model_label(model, current_version),
                                 "reasoning": model.startswith("openai/gpt-oss-"),
                             }
                             for index, model in enumerate(models)
                         ],
+                        "version": current_version,
                         "selected": selected,
                         "effort": self.server.memory.reasoning_effort(user["id"]),
                     },
@@ -1041,15 +1043,15 @@ class AssistantHandler(BaseHTTPRequestHandler):
         return models
 
     @staticmethod
-    def _model_label(model: str, index: int) -> str:
+    def _model_label(model: str, version: str) -> str:
         lowered = model.lower()
-        if "20b" in lowered or "8b" in lowered:
-            suffix = "Rápido"
-        elif "120b" in lowered:
+        if "120b" in lowered:
             suffix = "Potente"
+        elif "20b" in lowered or "8b" in lowered:
+            suffix = "Rápido"
         else:
             suffix = "Equilibrado"
-        return f"Oráculo 1.{index} · {suffix}"
+        return f"Oráculo {version} · {suffix}"
 
     def _learn_from_message(self, user_id: int, message: str, existing: list[dict]) -> None:
         try:
