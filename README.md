@@ -61,6 +61,25 @@ Copy-Item .env.example .env
 .\.venv\Scripts\ia-assistant.exe
 ```
 
+### macOS
+
+No Terminal, entre na pasta do projeto e execute:
+
+```bash
+bash install.sh
+```
+
+Abra o arquivo `.env`, preencha `GROQ_API_KEY` com a chave pessoal e inicie:
+
+```bash
+bash start.sh
+```
+
+O Oráculo exige Python 3.11 ou superior. No macOS, o ambiente virtual usa
+`.venv/bin`; caminhos `.venv\Scripts` e arquivos `.ps1` são exclusivos do Windows.
+Se o Terminal estiver fora da pasta do projeto, use `cd` até a pasta
+`ia-assistant-local` antes dos comandos.
+
 Na primeira inicializacao, o terminal mostra senhas temporarias para as tres contas
 administrativas: `will`, `gustavo` e `felipe`. Cada pessoa deve entrar com a
 propria conta e trocar a senha temporaria. As senhas sao armazenadas como hashes
