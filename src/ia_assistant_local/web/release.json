@@ -1,11 +1,13 @@
 {
-  "version": "1.5",
+  "version": "2.0",
   "published": true,
   "notes": [
-    "Imagens por Ctrl+V, com miniaturas e envio sem texto",
-    "Arquivos e pastas com revisão e conversão local para PDF",
-    "Configurações de aparência por conta",
-    "Raciocínio com ajuste gradual e efeito Full contínuo",
-    "Diagnóstico local dos erros recebidos"
+    "Detector de contradições com escolha da memória correta",
+    "Cofre privado criptografado e separado do contexto da IA",
+    "Fila de documentos com progresso, cancelamento e revisão",
+    "OCR local de imagens e captura pela câmera do celular",
+    "Web Clipper para páginas, seleções e capturas de tela",
+    "Novo painel de configurações organizado por área",
+    "Guia de novidades paginado, responsivo e sem scrollbar"
   ]
 }

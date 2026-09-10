@@ -36,7 +36,7 @@
     logout:icon('<path d="M10 4H5v16h5m4-12 4 4-4 4m-5-4h12"/>')
   };
   menu.innerHTML='<header role="none"><strong id="profileName"></strong><small id="profileRole"></small></header>'+
-    [["usage","Uso da conta",""],["mascot","Mostrar mascote","Alt+Shift+M"],["invite","Convide um amigo",""],["settings","Configurações","Ctrl+,"],["admin","Painel do dev-chefe",""],["logout","Sair",""]].map(([action,label,shortcut])=>
+    [["usage","Uso da conta",""],["mascot","Mostrar mascote","Alt+Shift+M"],["settings","Configurações","Ctrl+,"],["admin","Painel do dev-chefe",""],["logout","Sair",""]].map(([action,label,shortcut])=>
       '<button type="button" role="menuitem" tabindex="-1" data-profile="'+action+'">'+icons[action]+'<span class="menu-label">'+label+'</span><kbd>'+shortcut+'</kbd></button>').join("");
   document.body.append(menu);
   const dialog=document.createElement("dialog");dialog.className="profile-dialog";dialog.setAttribute("aria-labelledby","profileDialogTitle");
@@ -107,20 +107,40 @@
   }
   function settings(){
     const pet=window.OraculoMascot.status();
-    show("Configurações",'<p id="profileAccountInfo"></p><h3>Mascote</h3><label class="profile-toggle"><input type="checkbox" id="petVisible"> Mostrar mascote nesta conta</label><label class="profile-toggle"><input type="checkbox" id="petRoaming"> Passear, escalar e descansar pela interface</label><p>Arraste para mover; clique para conversar. O mascote fica sentado enquanto você digita. Atalho: Alt+Shift+M.</p><div class="profile-actions"><button class="btn" id="profileMemories">Gerenciar memórias</button><button class="btn" id="profileIntegrations">Integrações</button></div><h3>Alterar senha</h3><form id="profilePassword"><label>Senha atual<input type="password" name="current" autocomplete="current-password" required></label><label>Nova senha<input type="password" name="next" autocomplete="new-password" minlength="10" required></label><label>Confirme a nova senha<input type="password" name="repeat" autocomplete="new-password" minlength="10" required></label><button class="btn primary" type="submit">Salvar senha</button><p class="profile-status" role="status"></p></form>');
-    content.querySelector("#profileAccountInfo").textContent=account.display_name+" · "+(account.role==="owner"?"Dev-chefe":"Administrador");
+    show("Configurações",'<div class="settings-identity"><span class="settings-avatar">'+account.display_name.slice(0,2).toUpperCase()+'</span><div><strong>'+account.display_name+'</strong><small>@'+account.username+' · '+(account.role==="owner"?"Dev-chefe":"Administrador")+'</small></div></div><div class="settings-shell"><nav class="settings-nav" aria-label="Seções"><button type="button" data-settings="appearance" aria-pressed="true"><b>Visual</b><small>Aparência e leitura</small></button><button type="button" data-settings="experience"><b>Experiência</b><small>Mascote e apresentação</small></button><button type="button" data-settings="data"><b>Dados</b><small>Memória e privacidade</small></button><button type="button" data-settings="account"><b>Conta</b><small>Segurança de acesso</small></button></nav><div class="settings-content"><section id="settings-appearance"><header><small>INTERFACE</small><h3>Aparência e leitura</h3><p>Ajustes salvos somente para esta conta neste navegador.</p></header><label class="setting-row"><span><b>Tamanho do texto</b><small>Mensagens da conversa</small></span><select id="layoutText"><option value="14">Pequeno</option><option value="16">Padrão</option><option value="18">Grande</option><option value="20">Maior</option></select></label><label class="setting-row"><span><b>Largura da conversa</b><small>Área útil das respostas</small></span><select id="layoutWidth"><option value="760">Focada</option><option value="1000">Equilibrada</option><option value="1400">Ampla</option></select></label><label class="setting-row"><span><b>Modo compacto</b><small>Reduz o espaço entre mensagens</small></span><input id="layoutCompact" type="checkbox"></label><label class="setting-row"><span><b>Ambiente discreto</b><small>Oculta estrelas e nebulosas</small></span><input id="layoutQuiet" type="checkbox"></label><label class="setting-row"><span><b>Animações</b><small>Transições e efeito de escrita</small></span><input id="layoutEffects" type="checkbox"></label><button type="button" class="settings-reset" id="resetLayout">Restaurar padrão</button><p id="layoutStatus" class="profile-status" role="status"></p></section><section id="settings-experience" hidden><header><small>PERSONALIZAÇÃO</small><h3>Experiência do Oráculo</h3><p>Escolha os elementos interativos que deseja manter na interface.</p></header><label class="setting-row"><span><b>Mostrar mascote</b><small>Exibe o companheiro nesta conta</small></span><input type="checkbox" id="petVisible"></label><label class="setting-row"><span><b>Movimento livre</b><small>Permite caminhar e descansar pela interface</small></span><input type="checkbox" id="petRoaming"></label><button class="settings-feature" id="profileReplay"><span><b>Rever apresentação de versão</b><small>Executa novamente a abertura cinematográfica</small></span><i>›</i></button></section><section id="settings-data" hidden><header><small>CONTROLE LOCAL</small><h3>Dados e privacidade</h3><p>Gerencie o que o Oráculo guarda e processa neste computador.</p></header><div class="settings-features"><button class="settings-feature" id="profileMemories"><span><b>Memórias</b><small>Revisar fatos e contradições</small></span><i>›</i></button><button class="settings-feature" id="profileVault"><span><b>Cofre privado</b><small>Informações criptografadas fora do contexto</small></span><i>›</i></button><button class="settings-feature" id="profileTasks"><span><b>Tarefas em segundo plano</b><small>Progresso, resultados e cancelamentos</small></span><i>›</i></button><button class="settings-feature" id="profileSystem"><span><b>Estado do sistema</b><small>Groq, banco e serviços locais</small></span><i>›</i></button></div></section><section id="settings-account" hidden><header><small>SEGURANÇA</small><h3>Alterar senha</h3><p>Use uma senha exclusiva com pelo menos dez caracteres.</p></header><form id="profilePassword" class="settings-password"><label>Senha atual<input type="password" name="current" autocomplete="current-password" required></label><label>Nova senha<input type="password" name="next" autocomplete="new-password" minlength="10" required></label><label>Confirme a nova senha<input type="password" name="repeat" autocomplete="new-password" minlength="10" required></label><button class="btn primary" type="submit">Atualizar senha</button><p class="profile-status" role="status"></p></form></section></div></div>');
+    dialog.classList.add("settings-mode");
     content.querySelector("#petVisible").checked=pet.visible;
     content.querySelector("#petRoaming").checked=pet.roaming;
     content.querySelector("#petVisible").onchange=()=>window.OraculoMascot.toggle();
     content.querySelector("#petRoaming").onchange=event=>window.OraculoMascot.setRoaming(event.target.checked);
     content.querySelector("#profileMemories").hidden=!permissions.memory_access;
     content.querySelector("#profileMemories").onclick=()=>openPanel("memories");
-    content.querySelector("#profileIntegrations").onclick=()=>openPanel("integrations");
-    const system=document.createElement("button");system.type="button";system.className="btn";system.textContent="Sistema";system.id="profileSystem";system.onclick=()=>openPanel("health");
-    content.querySelector(".profile-actions").append(system);
-    const privacy=document.createElement("p");privacy.textContent="As conversas ficam registradas neste computador. Arquivos só são enviados ao modelo após sua revisão e confirmação.";
-    content.querySelector("#profileAccountInfo").after(privacy);
-    const form=content.querySelector("form");
+    content.querySelector("#profileVault").onclick=()=>openPanel("vault");
+    content.querySelector("#profileTasks").onclick=()=>openPanel("tasks");
+    content.querySelector("#profileReplay").onclick=()=>openPanel("replay-release");
+    content.querySelector("#profileSystem").onclick=()=>openPanel("health");
+    content.querySelector("#settings-appearance").append(content.querySelector("#profileReplay"));
+    content.querySelector("#settings-experience").remove();
+    content.querySelector('[data-settings="experience"]').remove();
+    const nav=[...content.querySelectorAll("[data-settings]")],panels=[...content.querySelectorAll(".settings-content>section")];
+    nav.forEach(button=>button.onclick=()=>{
+      nav.forEach(item=>item.setAttribute("aria-pressed",String(item===button)));
+      panels.forEach(panel=>panel.hidden=panel.id!=="settings-"+button.dataset.settings);
+      content.querySelector(".settings-content").scrollTop=0;
+    });
+    const bindings={text:"layoutText",width:"layoutWidth",compact:"layoutCompact",quiet:"layoutQuiet",effects:"layoutEffects"};
+    const refresh=()=>{for(const [key,id] of Object.entries(bindings)){const el=content.querySelector("#"+id);if(el.type==="checkbox")el.checked=layout[key];else el.value=layout[key];}};
+    const saveLayout=()=>{
+      applyLayout();
+      try{localStorage.setItem("oraculo-layout-"+account.id,JSON.stringify(layout));content.querySelector("#layoutStatus").textContent="Alterações aplicadas.";}
+      catch{content.querySelector("#layoutStatus").textContent="Aplicado, mas o navegador não permitiu salvar.";}
+    };
+    for(const [key,id] of Object.entries(bindings))content.querySelector("#"+id).onchange=event=>{
+      layout[key]=event.target.type==="checkbox"?event.target.checked:event.target.value;saveLayout();
+    };
+    content.querySelector("#resetLayout").onclick=()=>{layout={...defaults};refresh();saveLayout();};
+    refresh();
+    const form=content.querySelector("#profilePassword");
     form.onsubmit=async event=>{
       event.preventDefault();const status=form.querySelector(".profile-status"),save=form.querySelector("button");
       const current=form.elements.current.value,next=form.elements.next.value,repeat=form.elements.repeat.value;
@@ -130,55 +150,6 @@
       catch(error){status.textContent=error.message;}
       finally{save.disabled=false;}
     };
-    organizeSettings();
-  }
-  function organizeSettings(){
-    dialog.classList.add("settings-mode");
-    const nodes=[...content.children];
-    const panels={appearance:document.createElement("section"),pet:document.createElement("section"),
-      tools:document.createElement("section"),security:document.createElement("section")};
-    let group="security";
-    for(const node of nodes){
-      if(node.id==="profileAccountInfo")continue;
-      if(node.tagName==="H3")group=node.textContent==="Mascote"?"pet":"security";
-      if(node.classList.contains("profile-actions"))panels.tools.append(node);
-      else panels[group].append(node);
-    }
-    panels.appearance.innerHTML='<h3>Aparência e leitura</h3><p>Personalize este navegador. As alterações são salvas por conta e aplicadas na hora.</p>'+
-      '<label class="setting-row">Tamanho das mensagens<select id="layoutText"><option value="14">Pequeno · 14 px</option><option value="16">Padrão · 16 px</option><option value="18">Grande · 18 px</option><option value="20">Maior · 20 px</option></select></label>'+
-      '<label class="setting-row">Largura da conversa<select id="layoutWidth"><option value="760">Focada</option><option value="1000">Equilibrada</option><option value="1400">Ampla</option></select></label>'+
-      '<label class="profile-toggle"><input id="layoutCompact" type="checkbox"> Espaçamento compacto entre mensagens</label>'+
-      '<label class="profile-toggle"><input id="layoutQuiet" type="checkbox"> Fundo discreto, sem estrelas e nebulosas</label>'+
-      '<label class="profile-toggle"><input id="layoutEffects" type="checkbox"> Efeitos e animação de escrita</label>'+
-      '<button type="button" class="btn" id="resetLayout">Restaurar aparência padrão</button><p id="layoutStatus" role="status"></p>';
-    const heading=document.createElement("h3");heading.textContent="Recursos da conta";panels.tools.prepend(heading);
-    const nav=document.createElement("nav");nav.className="settings-nav";nav.setAttribute("aria-label","Seções das configurações");
-    const body=document.createElement("div");body.className="settings-content";
-    for(const [id,label] of [["appearance","Aparência"],["pet","Mascote"],["tools","Recursos"],["security","Segurança"]]){
-      const button=document.createElement("button");button.type="button";button.textContent=label;button.dataset.settings=id;
-      button.setAttribute("aria-controls","settings-"+id);button.setAttribute("aria-pressed",String(id==="appearance"));
-      const panel=panels[id];panel.id="settings-"+id;panel.hidden=id!=="appearance";
-      button.onclick=()=>{
-        for(const [key,section] of Object.entries(panels))section.hidden=key!==id;
-        nav.querySelectorAll("button").forEach(item=>item.setAttribute("aria-pressed",String(item===button)));
-        body.scrollTop=0;
-      };
-      nav.append(button);body.append(panel);
-    }
-    const info=content.querySelector("#profileAccountInfo");
-    content.replaceChildren(info,nav,body);
-    const bindings={text:"layoutText",width:"layoutWidth",compact:"layoutCompact",quiet:"layoutQuiet",effects:"layoutEffects"};
-    const refresh=()=>{for(const [key,id] of Object.entries(bindings)){const el=content.querySelector("#"+id);if(el.type==="checkbox")el.checked=layout[key];else el.value=layout[key];}};
-    const save=()=>{
-      applyLayout();
-      try{localStorage.setItem("oraculo-layout-"+account.id,JSON.stringify(layout));content.querySelector("#layoutStatus").textContent="Preferências salvas neste navegador.";}
-      catch{content.querySelector("#layoutStatus").textContent="Aplicado, mas o navegador não permitiu salvar as preferências.";}
-    };
-    for(const [key,id] of Object.entries(bindings))content.querySelector("#"+id).onchange=event=>{
-      layout[key]=event.target.type==="checkbox"?event.target.checked:event.target.value;save();
-    };
-    content.querySelector("#resetLayout").onclick=()=>{layout={...defaults};refresh();save();};
-    refresh();
   }
   trigger.addEventListener("click",openMenu);
   menu.addEventListener("click",async event=>{
@@ -225,7 +196,8 @@
     menu.querySelector("#profileRole").textContent=account?(account.role==="owner"?"Dev-chefe":"Administrador"):"";
   });
   window.addEventListener("oraculo:mascot",event=>{
-    menu.querySelector('[data-profile="mascot"] .menu-label').textContent=event.detail.visible?"Ocultar mascote":"Mostrar mascote";
+    const menuMascot=menu.querySelector('[data-profile="mascot"] .menu-label');
+    if(menuMascot)menuMascot.textContent=event.detail.visible?"Ocultar mascote":"Mostrar mascote";
     const visible=content.querySelector("#petVisible"),roaming=content.querySelector("#petRoaming");
     if(visible)visible.checked=event.detail.visible;if(roaming)roaming.checked=event.detail.roaming;
   });

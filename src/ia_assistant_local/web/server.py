@@ -19,11 +19,14 @@ import httpx
 from ..ai.agent import LocalAgent
 from ..core.actions import command_preview, execute_command, search_folder_context, validate_folder
 from ..core.attachments import extract_attachment, validate_image
+from ..core.background_tasks import TaskManager
 from ..core.config import PROJECT_ROOT, Settings
 from ..core.memory import PERMISSION_LABELS, MemoryStore
+from ..core.ocr import extract_image_text, ocr_available
 from ..core.pdf_export import convert_to_pdf
 from ..core.releases import prepare_release, publish_release, release_info
 from ..core.updater import apply_update, update_status
+from ..core.vault import decrypt_secret, encrypt_secret
 from ..integrations.extensions import extension_catalog
 from ..integrations.home_assistant import HomeAssistantClient
 from ..integrations.tools import ToolRegistry
@@ -98,7 +101,12 @@ class AssistantServer(ThreadingHTTPServer):
         self.agent = agent
         self.settings = settings
         self.memory = memory
+        self.tasks = TaskManager()
         self.started_at = time.time()
+
+    def server_close(self) -> None:
+        self.tasks.shutdown()
+        super().server_close()
 
 
 class AssistantHandler(BaseHTTPRequestHandler):
@@ -196,6 +204,8 @@ class AssistantHandler(BaseHTTPRequestHandler):
             "/profile.js": ("profile.js", "application/javascript; charset=utf-8"),
             "/release-ui.js": ("release-ui.js", "application/javascript; charset=utf-8"),
             "/attachments-ui.js": ("attachments-ui.js", "application/javascript; charset=utf-8"),
+            "/features-ui.js": ("features-ui.js", "application/javascript; charset=utf-8"),
+            "/features-ui.css": ("features-ui.css", "text/css; charset=utf-8"),
             "/mascot.js": ("mascot.js", "application/javascript; charset=utf-8"),
             "/desktop-ui.css": ("desktop-ui.css", "text/css; charset=utf-8"),
             "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
@@ -431,6 +441,43 @@ class AssistantHandler(BaseHTTPRequestHandler):
             except PermissionError as exc:
                 self._send_json(403, {"error": str(exc)})
             return
+        if path == "/api/memory-conflicts":
+            try:
+                user = self._require_user()
+                self._require_permission(user, "memory_access")
+                self._send_json(
+                    200, {"conflicts": self.server.memory.list_memory_conflicts(user["id"])}
+                )
+            except PermissionError as exc:
+                self._send_json(403, {"error": str(exc)})
+            return
+        if path == "/api/vault":
+            try:
+                user = self._require_user()
+                self._send_json(200, {"items": self.server.memory.list_vault_items(user["id"])})
+            except PermissionError as exc:
+                self._send_json(403, {"error": str(exc)})
+            return
+        if path == "/api/tasks":
+            try:
+                user = self._require_user()
+                self._send_json(
+                    200,
+                    {"tasks": self.server.tasks.list(user["id"]), "ocr_available": ocr_available()},
+                )
+            except PermissionError as exc:
+                self._send_json(403, {"error": str(exc)})
+            return
+        task_match = re.fullmatch(r"/api/tasks/([A-Za-z0-9_-]+)", path)
+        if task_match:
+            try:
+                user = self._require_user()
+                self._send_json(
+                    200, {"task": self.server.tasks.get(user["id"], task_match.group(1))}
+                )
+            except PermissionError as exc:
+                self._send_json(403, {"error": str(exc)})
+            return
         if path == "/favicon.ico":
             self.send_response(204)
             self.end_headers()
@@ -468,6 +515,60 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 payload = self._read_json()
                 created = self.server.memory.add_memory(user["id"], str(payload.get("content", "")))
                 self._send_json(201 if created else 200, {"created": created})
+                return
+            if self.path == "/api/vault":
+                user = self._require_user()
+                payload = self._read_json()
+                salt, nonce, ciphertext = encrypt_secret(
+                    str(payload.get("passphrase", "")), str(payload.get("content", ""))
+                )
+                item_id = self.server.memory.create_vault_item(
+                    user["id"], str(payload.get("label", "")), salt, nonce, ciphertext
+                )
+                self._send_json(201, {"id": item_id})
+                return
+            vault_unlock = re.fullmatch(r"/api/vault/(\d+)/unlock", self.path)
+            if vault_unlock:
+                user = self._require_user()
+                payload = self._read_json()
+                item = self.server.memory.vault_item(user["id"], int(vault_unlock.group(1)))
+                content = decrypt_secret(
+                    str(payload.get("passphrase", "")),
+                    item["salt"],
+                    item["nonce"],
+                    item["ciphertext"],
+                )
+                self._send_json(200, {"content": content, "included_in_ai": False})
+                return
+            if self.path == "/api/tasks":
+                user = self._require_user()
+                payload = self._read_json()
+                kind = str(payload.get("kind", ""))
+                name = Path(str(payload.get("name", "anexo"))).name[:180]
+                mime_type = str(payload.get("mime_type", ""))
+                data = str(payload.get("data", ""))
+                if kind == "extract":
+
+                    def work(cancel, progress):
+                        progress(30)
+                        return extract_attachment(name, mime_type, data)
+                elif kind == "ocr":
+                    image_url = f"data:{mime_type};base64,{data}"
+                    validate_image(image_url)
+
+                    def work(cancel, progress):
+                        progress(25)
+                        return {
+                            "name": name,
+                            "kind": "text",
+                            "content": extract_image_text(data),
+                            "truncated": False,
+                            "source": "ocr",
+                        }
+                else:
+                    raise ValueError("Tipo de tarefa desconhecido.")
+                task = self.server.tasks.create(user["id"], kind, name, work)
+                self._send_json(202, {"task": task})
                 return
             if self.path == "/api/attachments/pdf":
                 self._require_user()
@@ -641,6 +742,16 @@ class AssistantHandler(BaseHTTPRequestHandler):
 
     def do_PUT(self) -> None:
         try:
+            conflict_match = re.fullmatch(r"/api/memory-conflicts/(\d+)", self.path)
+            if conflict_match:
+                user = self._require_user()
+                self._require_permission(user, "memory_access")
+                payload = self._read_json()
+                resolved = self.server.memory.resolve_memory_conflict(
+                    user["id"], int(conflict_match.group(1)), str(payload.get("choice", ""))
+                )
+                self._send_json(200, {"resolved": resolved})
+                return
             if self.path == "/api/model":
                 user = self._require_user()
                 payload = self._read_json()
@@ -946,12 +1057,18 @@ class AssistantHandler(BaseHTTPRequestHandler):
             for memory_key in changes["forget_keys"]:
                 self.server.memory.delete_memory_by_key(user_id, memory_key)
             for memory in changes["upserts"]:
-                self.server.memory.upsert_memory(
-                    user_id,
-                    memory["category"],
-                    memory["key"],
-                    memory["content"],
+                current = self.server.memory.memory_for_key(
+                    user_id, memory["category"], memory["key"]
                 )
+                clean = self.server.memory._clean_memory_content(memory["content"])
+                if current and current["content"].casefold() != clean.casefold():
+                    self.server.memory.create_memory_conflict(
+                        user_id, memory["category"], memory["key"], current["content"], clean
+                    )
+                else:
+                    self.server.memory.upsert_memory(
+                        user_id, memory["category"], memory["key"], clean
+                    )
         except (httpx.HTTPError, RuntimeError, TypeError, ValueError):
             return
 
@@ -962,6 +1079,13 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 self._require_permission(user, "memory_access")
                 memory_id = int(self.path.removeprefix("/api/memories/"))
                 deleted = self.server.memory.delete_memory(user["id"], memory_id)
+            elif self.path.startswith("/api/vault/"):
+                item_id = int(self.path.removeprefix("/api/vault/"))
+                deleted = self.server.memory.delete_vault_item(user["id"], item_id)
+            elif self.path.startswith("/api/tasks/"):
+                task_id = self.path.removeprefix("/api/tasks/")
+                self.server.tasks.cancel(user["id"], task_id)
+                deleted = True
             elif self.path.startswith("/api/chats/"):
                 chat_id = int(self.path.removeprefix("/api/chats/"))
                 deleted = self.server.memory.delete_chat(user["id"], chat_id)

@@ -935,7 +935,8 @@
   .extension-status.active{ color:#67f1cd; background:rgba(55,235,190,.1); }
   @media(max-width:640px){ .extension-grid{ grid-template-columns:1fr; } }
 </style>
-<link rel="stylesheet" href="/desktop-ui.css">
+  <link rel="stylesheet" href="/desktop-ui.css">
+  <link rel="stylesheet" href="/features-ui.css">
 </head>
 <body>
 
@@ -1089,32 +1090,24 @@
     <div class="slash-menu" id="slashMenu" hidden></div>
     <form class="inputbar" id="inputForm">
       <div id="composerAttachments" aria-label="Anexos preparados" aria-live="polite" hidden></div>
-      <button type="button" class="attach-btn" id="attachBtn" aria-label="Anexar arquivo">＋</button>
-      <input type="file" id="attachmentFolder" hidden webkitdirectory multiple>
-      <input type="file" id="attachmentInput" multiple hidden accept=".docx,.pdf,.txt,.md,.csv,.json,.yaml,.yml,.xml,.html,.css,.js,.ts,.py,.java,.c,.cpp,.h,.sql,.log,image/png,image/jpeg,image/webp">
+      <div class="attachment-menu-wrap">
+        <button type="button" class="attach-btn" id="attachBtn" aria-label="Adicionar ao chat" aria-haspopup="menu" aria-expanded="false">＋</button>
+        <div class="attachment-menu" id="attachmentMenu" role="menu" aria-label="Adicionar ao chat" hidden>
+          <div class="attachment-menu-title">Adicionar ao chat</div>
+          <button type="button" id="chooseAttachmentFiles" role="menuitem"><span class="attachment-menu-icon">▱</span><span><strong>Arquivos e imagens</strong><small>Documentos, códigos ou fotos</small></span></button>
+          <button type="button" id="chooseAttachmentFolder" role="menuitem"><span class="attachment-menu-icon">⌑</span><span><strong>Pasta</strong><small>Inclui os arquivos compatíveis</small></span></button>
+          <button type="button" id="chooseAttachmentCamera" role="menuitem"><span class="attachment-menu-icon">◉</span><span><strong>Câmera</strong><small>Fotografar e anexar</small></span></button>
+          <p>Também é possível arrastar arquivos ou colar uma imagem com Ctrl+V.</p>
+        </div>
+        <input type="file" id="attachmentFolder" hidden webkitdirectory multiple>
+        <input type="file" id="attachmentCamera" hidden accept="image/*" capture="environment">
+        <input type="file" id="attachmentInput" multiple hidden accept=".docx,.pdf,.txt,.md,.csv,.json,.yaml,.yml,.xml,.html,.css,.js,.ts,.py,.java,.c,.cpp,.h,.sql,.log,image/png,image/jpeg,image/webp">
+      </div>
       <input id="inputField" autocomplete="off" placeholder="Pergunte ao Oráculo…" />
       <button type="submit" id="sendBtn" aria-label="Enviar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
       </button>
     </form>
-  </div>
-</div>
-
-<div class="modal-overlay" id="attachmentOverlay">
-  <div class="modal" style="width:min(720px,95vw)">
-    <h2>Arquivos e pastas</h2>
-    <div class="modal-actions"><button type="button" class="btn" id="chooseAttachmentFiles">Escolher arquivos</button><button type="button" class="btn" id="chooseAttachmentFolder">Escolher pasta</button></div>
-    <details class="attachment-limits"><summary>Limites e privacidade</summary><p>Até 50 arquivos, 5 MB por arquivo e 20 MB por lote. Pastas privadas, .env e chaves não são incluídos. Revise os trechos antes de anexar.</p></details>
-    <div id="attachmentList" style="max-height:150px;overflow:auto"></div>
-    <p id="attachmentNotice" class="privacy-note" role="status"></p>
-    <p id="attachmentMeta" style="color:var(--text-dim)"></p>
-    <textarea class="attachment-preview" id="attachmentTextPreview" aria-label="Conteúdo que poderá ser enviado"></textarea>
-    <img class="attachment-image" id="attachmentImagePreview" alt="Prévia do anexo" hidden>
-    <p class="attachment-hint">Os anexos só vão para a IA quando você enviar a mensagem.</p>
-    <div class="modal-actions">
-      <button type="button" class="btn" id="cancelAttachment">Cancelar</button>
-      <button type="button" class="btn primary" id="confirmAttachment">Anexar selecionados</button>
-    </div>
   </div>
 </div>
 
@@ -1189,6 +1182,9 @@
       qualquer memória.
     </p>
     <div class="memory-list" id="memoryList"></div>
+    <h2 style="margin-top:22px">Contradições pendentes</h2>
+    <p style="color:var(--text-dim)">Uma informação nova não substitui a anterior até você escolher.</p>
+    <div class="memory-list" id="memoryConflicts"></div>
     <h2 style="margin-top:22px">Linha do tempo da memória</h2>
     <div class="timeline" id="memoryTimeline"></div>
     <div class="modal-actions">
@@ -1242,26 +1238,39 @@
 </div>
 
 <div class="modal-overlay" id="adminOverlay">
-  <div class="modal" style="width:min(760px,94vw)">
-    <h2>Painel exclusivo do dev-chefe</h2>
-    <p style="color:var(--text-dim)">
-      Controle o que cada membro da equipe pode acessar. Felipe mantém acesso total.
-    </p>
-    <h2 style="margin-top:20px">Central administrativa</h2>
-    <div class="admin-shortcuts">
-      <button type="button" class="btn" data-admin-shortcut="update">Atualizar Oráculo</button>
-      <button type="button" class="btn" id="launchRelease" hidden>Lançar nova versão</button>
-    </div>
-    <div class="permission-users" id="permissionUsers"></div>
-    <div class="permission-message" id="permissionMessage"></div>
-    <h2 style="margin-top:20px">Auditoria de conversas</h2>
-    <p style="color:var(--text-dim)">
-      Auditoria das conversas de Will e Gustavo para validar testes e problemas.
-    </p>
-    <div class="audit-list" id="auditList"></div>
-    <div class="audit-content" id="auditContent"></div>
-    <div class="modal-actions">
-      <button type="button" class="btn primary" id="closeAdmin">Fechar</button>
+  <div class="modal admin-console">
+    <header class="admin-console-head">
+      <div><span class="admin-eyebrow">ACESSO EXCLUSIVO · FELIPE</span><h2>Central do dev-chefe</h2><p>Controle operacional, equipe e validação em um só lugar.</p></div>
+      <button type="button" id="closeAdmin" class="admin-close" aria-label="Fechar">×</button>
+    </header>
+    <nav class="admin-nav" aria-label="Áreas administrativas">
+      <button type="button" data-admin-view="overview" aria-pressed="true">Visão geral</button>
+      <button type="button" data-admin-view="team">Equipe e acessos</button>
+      <button type="button" data-admin-view="audit">Auditoria</button>
+    </nav>
+    <div class="admin-body">
+      <section class="admin-view" id="admin-view-overview">
+        <div class="admin-release-card">
+          <div><span class="admin-badge">PUBLICAÇÃO CONTROLADA</span><h3>Próxima versão do Oráculo</h3><p>Revise os arquivos, gere o manifesto e publique na branch principal com verificação de segredos.</p><small id="adminReleaseVersion">Consultando versão…</small></div>
+          <div class="admin-release-actions"><button type="button" class="btn primary" id="launchRelease" hidden>Lançar nova versão</button><button type="button" class="btn" data-admin-shortcut="update">Verificar atualização</button></div>
+        </div>
+        <div class="admin-metrics">
+          <article><small>SISTEMA</small><strong id="adminSystemState">—</strong><span>Groq e banco local</span></article>
+          <article><small>EQUIPE</small><strong id="adminTeamCount">—</strong><span>contas administradas</span></article>
+          <article><small>CONVERSAS</small><strong id="adminChatCount">—</strong><span>disponíveis para auditoria</span></article>
+          <article><small>ERROS · 24H</small><strong id="adminErrorCount">—</strong><span>falhas registradas</span></article>
+        </div>
+        <div class="admin-principle"><span>◈</span><div><strong>Controle local e transparente</strong><p>As ações administrativas são validadas pelo servidor. Nenhuma permissão é concedida apenas por estar visível nesta tela.</p></div></div>
+      </section>
+      <section class="admin-view" id="admin-view-team" hidden>
+        <header class="admin-section-head"><div><small>CONTROLE DE ACESSO</small><h3>Equipe e permissões</h3><p>Felipe mantém acesso total; alterações abaixo afetam somente Will e Gustavo.</p></div></header>
+        <div class="permission-users" id="permissionUsers"></div>
+        <div class="permission-message" id="permissionMessage" role="status"></div>
+      </section>
+      <section class="admin-view" id="admin-view-audit" hidden>
+        <header class="admin-section-head"><div><small>VALIDAÇÃO DE TESTES</small><h3>Auditoria de conversas</h3><p>Consulte interações da equipe para investigar erros e validar o comportamento do Oráculo.</p></div></header>
+        <div class="admin-audit-layout"><div class="audit-list" id="auditList"></div><div class="audit-content" id="auditContent"><div class="admin-empty">Selecione uma conversa para inspecionar.</div></div></div>
+      </section>
     </div>
   </div>
 </div>
@@ -1270,6 +1279,7 @@
 <script src="/profile.js"></script>
 <script src="/release-ui.js"></script>
 <script src="/attachments-ui.js"></script>
+<script src="/features-ui.js"></script>
 <script>
 (function(){
   "use strict";
@@ -2027,8 +2037,8 @@
   }
 
   async function loadMemories(){
-    const [data, timelineData] = await Promise.all([
-      api("/api/memories"), api("/api/memory-timeline")
+    const [data, timelineData, conflictData] = await Promise.all([
+      api("/api/memories"), api("/api/memory-timeline"), api("/api/memory-conflicts")
     ]);
     const categoryLabels = {
       personal:"Pessoal",
@@ -2040,6 +2050,24 @@
     const timeline = document.getElementById("memoryTimeline");
     timeline.innerHTML = "";
     const actionLabels = {learned:"Aprendida", updated:"Corrigida", forgotten:"Esquecida"};
+    const conflicts = document.getElementById("memoryConflicts");
+    conflicts.replaceChildren();
+    if(conflictData.conflicts.length){
+      const heading=document.createElement("h3"); heading.textContent="Contradições pendentes"; conflicts.append(heading);
+    }
+    conflictData.conflicts.forEach(item=>{
+      const card=document.createElement("article"); card.className="memory-conflict";
+      const title=document.createElement("strong"); title.textContent="Qual informação deve permanecer?";
+      const oldText=document.createElement("p"); oldText.textContent="Atual: "+item.old_content;
+      const newText=document.createElement("p"); newText.textContent="Nova: "+item.new_content;
+      const actions=document.createElement("div"); actions.className="modal-actions";
+      for(const [choice,label] of [["old","Manter atual"],["new","Usar nova"]]){
+        const button=document.createElement("button"); button.type="button"; button.className="btn"; button.textContent=label;
+        button.onclick=async()=>{button.disabled=true; await api("/api/memory-conflicts/"+item.id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({choice})}); await loadMemories();};
+        actions.append(button);
+      }
+      card.append(title,oldText,newText,actions); conflicts.append(card);
+    });
     if(!timelineData.events.length) timeline.textContent = "Ainda não há eventos.";
     timelineData.events.forEach(item=>{
       const row = document.createElement("div");
@@ -2116,10 +2144,12 @@
     pendingImages.forEach((item,index)=>{
       const chip = document.createElement("div"); chip.className = "attachment-thumbnail";
       const name = document.createElement("img"); name.src = item.dataUrl; name.alt = item.name; name.title = item.name;
+      const ocr = document.createElement("button"); ocr.type="button"; ocr.className="attachment-ocr"; ocr.textContent="OCR"; ocr.title="Extrair texto desta imagem";
+      ocr.addEventListener("click",()=>window.dispatchEvent(new CustomEvent("oraculo:ocr-image",{detail:item})));
       const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "×"; remove.title = "Não enviar esta imagem";
       remove.setAttribute("aria-label", "Remover imagem " + item.name);
       remove.addEventListener("click", ()=>{ attachmentManager.forget(item.name); pendingImages.splice(index,1); renderApprovedContexts(); });
-      chip.append(name,remove); tray.appendChild(chip);
+      chip.append(name,ocr,remove); tray.appendChild(chip);
     });
     approvedContextCard.hidden = true;
     tray.hidden = pendingContexts.length === 0 && pendingImages.length === 0;
@@ -2790,15 +2820,23 @@
   async function openAdminPanel(){
     if(!currentAccount || currentAccount.role !== "owner") return;
     adminOverlay.classList.add("show");
-    auditContent.innerHTML = "";
+    document.querySelector('[data-admin-view="overview"]').click();
+    auditContent.innerHTML = '<div class="admin-empty">Selecione uma conversa para inspecionar.</div>';
     auditList.textContent = "Carregando…";
     permissionUsers.textContent = "Carregando permissões…";
     permissionMessage.textContent = "";
     try{
-      const [data, permissionData] = await Promise.all([
+      const [data, permissionData, health, release] = await Promise.all([
         api("/api/admin/chats"),
-        api("/api/admin/permissions")
+        api("/api/admin/permissions"),
+        api("/api/health"),
+        api("/api/release")
       ]);
+      document.getElementById("adminSystemState").textContent=health.groq&&health.database?"Estável":"Atenção";
+      document.getElementById("adminTeamCount").textContent=permissionData.users.length;
+      document.getElementById("adminChatCount").textContent=data.chats.length;
+      document.getElementById("adminErrorCount").textContent=health.errors_24h;
+      document.getElementById("adminReleaseVersion").textContent="Versão atual · "+release.version;
       renderPermissionUsers(permissionData);
       auditList.innerHTML = "";
       if(!data.chats.length){
@@ -2810,7 +2848,11 @@
         button.type = "button";
         button.className = "btn audit-chat";
         button.textContent = chat.display_name + " · " + chat.title;
-        button.addEventListener("click", ()=>openAuditChat(chat.id));
+        button.addEventListener("click", ()=>{
+          auditList.querySelectorAll(".audit-chat").forEach(item=>item.classList.remove("active"));
+          button.classList.add("active");
+          openAuditChat(chat.id);
+        });
         auditList.appendChild(button);
       });
     }catch(err){
@@ -2839,6 +2881,12 @@
     if(!currentAccount) return;
     const panels={memories:openSettings,integrations:openExtensions,health:openHealth,admin:openAdminPanel};
     panels[event.detail]?.();
+  });
+  document.querySelectorAll("[data-admin-view]").forEach(button=>{
+    button.addEventListener("click",()=>{
+      document.querySelectorAll("[data-admin-view]").forEach(item=>item.setAttribute("aria-pressed",String(item===button)));
+      document.querySelectorAll(".admin-view").forEach(view=>view.hidden=view.id!=="admin-view-"+button.dataset.adminView);
+    });
   });
   document.querySelectorAll("[data-admin-shortcut]").forEach(button=>{
     button.addEventListener("click", ()=>{
@@ -2893,6 +2941,21 @@
       renderApprovedContexts();
     }
   });
+  window.OraculoBridge={
+    addContexts(items){
+      const clean=items.map(item=>({source:String(item.source||"Conteúdo revisado").slice(0,160),content:String(item.content||"").slice(0,12000)})).filter(item=>item.content.trim());
+      const combined=[...pendingContexts,...clean];
+      if(combined.length>50 || combined.reduce((n,item)=>n+item.content.length,0)>60000) throw new Error("Limite de contexto atingido.");
+      pendingContexts=combined; renderApprovedContexts(); inputField.focus();
+    },
+    addImage(item){
+      if(pendingImages.length) throw new Error("Remova a imagem preparada antes de adicionar outra.");
+      if(!/^data:image\/(png|jpeg|webp);base64,/i.test(String(item.dataUrl||""))) throw new Error("Imagem inválida.");
+      pendingImages=[{name:String(item.name||"imagem").slice(0,160),dataUrl:item.dataUrl}]; renderApprovedContexts(); inputField.focus();
+    },
+    message(text){addMessage("system",String(text).slice(0,1000));},
+    account(){return currentAccount;}
+  };
   function openExtensions(){ extensionsOverlay.classList.add("show"); loadExtensions().catch(err=>extensionGrid.textContent=err.message); }
   document.getElementById("closeExtensions").addEventListener("click", ()=>extensionsOverlay.classList.remove("show"));
   document.getElementById("closeUpdate").addEventListener("click", ()=>updateOverlay.classList.remove("show"));

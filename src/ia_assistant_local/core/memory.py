@@ -159,6 +159,28 @@ class MemoryStore:
                     created_at INTEGER NOT NULL DEFAULT (unixepoch()),
                     UNIQUE(user_id, name)
                 );
+                CREATE TABLE IF NOT EXISTS memory_conflicts (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    category TEXT NOT NULL,
+                    memory_key TEXT NOT NULL,
+                    old_content TEXT NOT NULL,
+                    new_content TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending'
+                        CHECK (status IN ('pending', 'kept_old', 'used_new')),
+                    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+                    resolved_at INTEGER
+                );
+                CREATE TABLE IF NOT EXISTS vault_items (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    label TEXT NOT NULL,
+                    salt TEXT NOT NULL,
+                    nonce TEXT NOT NULL,
+                    ciphertext TEXT NOT NULL,
+                    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+                    updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+                );
                 CREATE INDEX IF NOT EXISTS chats_user_id ON chats(user_id, updated_at);
                 CREATE INDEX IF NOT EXISTS messages_user_id ON messages(user_id, id);
                 CREATE INDEX IF NOT EXISTS memories_user_id ON memories(user_id, id);
@@ -989,6 +1011,110 @@ class MemoryStore:
         clean = self._clean_memory_content(content)
         digest = hashlib.sha256(clean.casefold().encode("utf-8")).hexdigest()[:16]
         return self.upsert_memory(user_id, "personal", f"explicit_{digest}", clean) != "unchanged"
+
+    def memory_for_key(self, user_id: int, category: str, key: str) -> dict | None:
+        _, memory_key = self._canonical_memory_key(category, key)
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM memories WHERE user_id = ? AND memory_key = ?",
+                (user_id, memory_key),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def create_memory_conflict(
+        self, user_id: int, category: str, key: str, old_content: str, new_content: str
+    ) -> int:
+        category, memory_key = self._canonical_memory_key(category, key)
+        clean_old = self._clean_memory_content(old_content)
+        clean_new = self._clean_memory_content(new_content)
+        with self._connect() as connection:
+            existing = connection.execute(
+                """SELECT id FROM memory_conflicts
+                   WHERE user_id = ? AND memory_key = ? AND new_content = ?
+                     AND status = 'pending'""",
+                (user_id, memory_key, clean_new),
+            ).fetchone()
+            if existing:
+                return int(existing["id"])
+            cursor = connection.execute(
+                """INSERT INTO memory_conflicts
+                   (user_id, category, memory_key, old_content, new_content)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (user_id, category, memory_key, clean_old, clean_new),
+            )
+        return int(cursor.lastrowid)
+
+    def list_memory_conflicts(self, user_id: int) -> list[dict]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """SELECT id, category, memory_key, old_content, new_content, created_at
+                   FROM memory_conflicts WHERE user_id = ? AND status = 'pending'
+                   ORDER BY id DESC""",
+                (user_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def resolve_memory_conflict(self, user_id: int, conflict_id: int, choice: str) -> bool:
+        if choice not in {"old", "new"}:
+            raise ValueError("Escolha inválida para a contradição.")
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM memory_conflicts
+                   WHERE id = ? AND user_id = ? AND status = 'pending'""",
+                (conflict_id, user_id),
+            ).fetchone()
+        if row is None:
+            return False
+        if choice == "new":
+            self.upsert_memory(user_id, row["category"], row["memory_key"], row["new_content"])
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """UPDATE memory_conflicts SET status = ?, resolved_at = unixepoch()
+                   WHERE id = ? AND user_id = ? AND status = 'pending'""",
+                ("used_new" if choice == "new" else "kept_old", conflict_id, user_id),
+            )
+        return cursor.rowcount > 0
+
+    def create_vault_item(
+        self, user_id: int, label: str, salt: str, nonce: str, ciphertext: str
+    ) -> int:
+        clean_label = " ".join(label.split())
+        if not clean_label or len(clean_label) > 120:
+            raise ValueError("O nome do item deve ter entre 1 e 120 caracteres.")
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """INSERT INTO vault_items (user_id, label, salt, nonce, ciphertext)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (user_id, clean_label, salt, nonce, ciphertext),
+            )
+        return int(cursor.lastrowid)
+
+    def list_vault_items(self, user_id: int) -> list[dict]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """SELECT id, label, created_at, updated_at FROM vault_items
+                   WHERE user_id = ? ORDER BY updated_at DESC, id DESC""",
+                (user_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def vault_item(self, user_id: int, item_id: int) -> dict:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM vault_items WHERE id = ? AND user_id = ?",
+                (item_id, user_id),
+            ).fetchone()
+        if row is None:
+            raise PermissionError("Item do cofre não encontrado.")
+        return dict(row)
+
+    def delete_vault_item(self, user_id: int, item_id: int) -> bool:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM vault_items WHERE id = ? AND user_id = ?",
+                (item_id, user_id),
+            )
+        return cursor.rowcount > 0
 
     def list_memories(self, user_id: int, limit: int = 100) -> list[dict]:
         with self._connect() as connection:

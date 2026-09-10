@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "Oráculo Web Clipper",
+  "version": "1.0.0",
+  "description": "Envia páginas, seleções e capturas para revisão no Oráculo local.",
+  "permissions": ["activeTab", "scripting", "tabs"],
+  "host_permissions": ["http://127.0.0.1:8765/*", "http://localhost:8765/*"],
+  "action": {"default_title": "Enviar ao Oráculo", "default_popup": "popup.html"}
+}

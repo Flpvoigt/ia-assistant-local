@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Oráculo Web Clipper</title>
+  <style>
+    :root{color-scheme:dark;font:14px system-ui}body{width:290px;margin:0;padding:18px;color:#eee;background:#0b0910}
+    small{color:#72ddf2;letter-spacing:.12em}h1{margin:5px 0 14px;font-size:19px}
+    button{width:100%;margin:5px 0;padding:11px;border:1px solid #443a55;border-radius:10px;color:#ddd;background:#15121d;cursor:pointer;text-align:left}
+    button:hover{border-color:#7b67a0;background:#1b1725}#status{min-height:34px;margin:10px 2px 0;color:#aaa;line-height:1.35}
+  </style>
+</head>
+<body>
+  <small>ORÁCULO · LOCAL</small><h1>Enviar para revisão</h1>
+  <button data-action="selection">Trecho selecionado</button>
+  <button data-action="page">Texto visível da página</button>
+  <button data-action="image">Captura da tela</button>
+  <p id="status">Nada é enviado à IA sem revisão no Oráculo.</p>
+  <script src="popup.js"></script>
+</body>
+</html>

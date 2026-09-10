@@ -1,14 +1,12 @@
 /* Local attachment review. File contents never reach the model before confirmation. */
 window.installAttachments = function({api, message, getAccount, addContexts, addImage, imageCount, onConverted}) {
   const byId = id => document.getElementById(id);
-  const overlay = byId("attachmentOverlay");
   const input = byId("attachmentInput");
   const folder = byId("attachmentFolder");
-  const preview = byId("attachmentTextPreview");
-  const image = byId("attachmentImagePreview");
-  const meta = byId("attachmentMeta");
-  const list = byId("attachmentList");
-  let entries = [], originals = [], selected = -1, busy = false, generation = 0;
+  const camera = byId("attachmentCamera");
+  const trigger = byId("attachBtn");
+  const menu = byId("attachmentMenu");
+  let originals = [], busy = false, generation = 0;
   const urls = new Set();
   const blocked = /(^|\/)(\.env(?:\..*)?|\.git|\.venv|venv|node_modules|__pycache__|\.ssh|data)(\/|$)|\.(?:pem|key|p12|pfx|sqlite3?|db)$/i;
   const supported = /\.(pdf|docx|txt|md|csv|json|yaml|yml|xml|html|css|js|ts|py|java|c|cpp|h|sql|log|png|jpe?g|webp)$/i;
@@ -18,38 +16,51 @@ window.installAttachments = function({api, message, getAccount, addContexts, add
     reader.onerror = () => reject(new Error("Não foi possível ler " + file.name));
     reader.readAsDataURL(file);
   });
-  function persistPreview() {
-    if(entries[selected]?.result.kind === "text") entries[selected].content = preview.value;
+  function setMenu(open) {
+    menu.hidden = !open;
+    trigger.classList.toggle("is-open", open);
+    trigger.setAttribute("aria-expanded", String(open));
   }
-  function select(index) {
-    persistPreview(); selected = index;
-    const item = entries[index];
-    if(!item) { preview.value = ""; preview.hidden = true; image.hidden = true; return; }
-    const isImage = item.result.kind === "image";
-    preview.hidden = isImage; image.hidden = !isImage;
-    if(isImage) image.src = item.dataUrl;
-    else { image.removeAttribute("src"); preview.value = item.content; }
-    meta.textContent = item.path + " · " + Math.ceil(item.file.size/1024) + " KB" +
-      (item.result.truncated ? " · texto limitado a 12.000 caracteres; PDF usa o original" : "");
+  function setBusy(value) {
+    busy = value;
+    trigger.classList.toggle("is-busy", value);
+    trigger.setAttribute("aria-label", value ? "Preparando anexo" : "Adicionar ao chat");
   }
-  function render() {
-    list.replaceChildren();
-    entries.forEach((item,index) => {
-      const row = document.createElement("label"); row.className = "attachment-row";
-      const check = document.createElement("input"); check.type = "checkbox"; check.checked = item.checked;
-      check.addEventListener("change", () => item.checked = check.checked);
-      const button = document.createElement("button"); button.type = "button"; button.className = "btn";
-      button.textContent = item.path; button.title = "Revisar " + item.path;
-      button.addEventListener("click", event => { event.preventDefault(); select(index); });
-      row.append(check,button); list.append(row);
-    });
-    byId("confirmAttachment").disabled = busy || !entries.length;
+  function reportRejected(items) {
+    if(items.length) message("system", "Não foi possível anexar " + items.length + " item(ns): " + items.slice(0,8).join("; "));
+  }
+  function attachPrepared(entries, rejected) {
+    const texts = entries.filter(item => item.result.kind === "text");
+    let images = entries.filter(item => item.result.kind === "image");
+    if(images.length + imageCount() > 1) {
+      const available = Math.max(0, 1 - imageCount());
+      rejected.push(...images.slice(available).map(item => item.path + " (uma imagem por mensagem)"));
+      images = images.slice(0, available);
+    }
+    if(texts.some(item => !item.content.trim() || item.content.length > 12000) ||
+        texts.reduce((total,item) => total + item.content.length, 0) > 60000) {
+      rejected.push("contexto de texto (limite de 12.000 caracteres por arquivo e 60.000 no total)");
+      texts.length = 0;
+    }
+    const accepted = [...texts, ...images];
+    if(originals.reduce((total,item) => total + item.file.size, 0) +
+        accepted.reduce((total,item) => total + item.file.size, 0) > 20_000_000) {
+      rejected.push("lote (os originais desta sessão atingiram 20 MB)");
+      reportRejected(rejected); return;
+    }
+    try {
+      if(texts.length) addContexts(texts.map(item => ({source:"Arquivo: " + item.path, content:item.content})));
+      for(const item of images) addImage({name:item.path, dataUrl:item.dataUrl});
+      originals.push(...accepted);
+    } catch(error) { rejected.push(error.message); }
+    reportRejected(rejected);
+    byId("inputField").focus();
   }
   async function stage(files, token = generation) {
     if(!getAccount()) return;
     if(busy) return message("system", "Aguarde a leitura atual antes de adicionar outros anexos.");
-    busy = true; overlay.classList.add("show"); render();
-    const rejected = [];
+    setMenu(false); setBusy(true);
+    const entries = [], rejected = [];
     try {
       for(const {file,path} of files) {
         if(token !== generation) return;
@@ -59,23 +70,25 @@ window.installAttachments = function({api, message, getAccount, addContexts, add
             entries.reduce((sum,item)=>sum+item.file.size,0)+file.size > 20_000_000) {
           rejected.push(path + " (limite: 50 arquivos, 5 MB por arquivo, 20 MB no lote)"); continue;
         }
-        meta.textContent = "Lendo " + path + "…";
         try {
           const dataUrl = await read(file);
+          if(file.size >= 750_000 && !file.type.startsWith("image/")) {
+            const task = await api("/api/tasks", {method:"POST",headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({kind:"extract",name:file.name,mime_type:file.type,data:dataUrl.split(",")[1]})});
+            window.dispatchEvent(new CustomEvent("oraculo:task-created",{detail:task.task}));
+            rejected.push(path + " (processando em segundo plano)");
+            continue;
+          }
           const result = await api("/api/attachments/extract", {method:"POST",headers:{"Content-Type":"application/json"},
             body:JSON.stringify({name:file.name,mime_type:file.type,data:dataUrl.split(",")[1]})});
           if(token !== generation) return;
-          entries.push({file,path,dataUrl,result:result.attachment,content:result.attachment.content || "",checked:true});
+          entries.push({file,path,dataUrl,result:result.attachment,content:result.attachment.content || ""});
         } catch(error) { rejected.push(path + ": " + error.message); }
       }
     } finally {
       if(token === generation) {
-        busy = false; render(); select(entries.length ? 0 : -1);
-        byId("attachmentNotice").textContent = rejected.length ?
-          "Não incluídos (" + rejected.length + "): " + rejected.slice(0,12).join("; ") : "";
-        if(!entries.length) meta.textContent = "Escolha arquivos ou uma pasta. Arquivos privados e formatos não suportados não serão incluídos.";
-        if(!rejected.length && entries.length === 1 && entries[0].result.kind === "image" && !imageCount())
-          byId("confirmAttachment").click();
+        attachPrepared(entries, rejected);
+        setBusy(false);
       }
     }
   }
@@ -113,42 +126,18 @@ window.installAttachments = function({api, message, getAccount, addContexts, add
     saveDownload(response.data,item.file.name.replace(/\.[^.]+$/,"")+".pdf",token);
     if(token === generation) onConverted(item.path);
   }
-  byId("attachBtn").addEventListener("click", () => {
-    if(!getAccount()) return;
-    overlay.classList.add("show");
-    if(!entries.length) { meta.textContent = "Escolha arquivos ou uma pasta para revisar."; select(-1); render(); }
+  trigger.addEventListener("click", event => {
+    event.stopPropagation();
+    if(getAccount() && !busy) setMenu(menu.hidden);
   });
-  byId("chooseAttachmentFiles").addEventListener("click",()=>input.click());
-  byId("chooseAttachmentFolder").addEventListener("click",()=>folder.click());
+  byId("chooseAttachmentFiles").addEventListener("click",()=>{ setMenu(false); input.click(); });
+  byId("chooseAttachmentFolder").addEventListener("click",()=>{ setMenu(false); folder.click(); });
+  byId("chooseAttachmentCamera").addEventListener("click",()=>{ setMenu(false); camera.click(); });
   input.addEventListener("change",()=>{choose(input.files); input.value="";});
   folder.addEventListener("change",()=>{choose(folder.files); folder.value="";});
-  byId("cancelAttachment").addEventListener("click",()=>{
-    generation++; busy=false; entries=[]; selected=-1; overlay.classList.remove("show");
-    preview.value=""; image.removeAttribute("src"); render();
-  });
-  byId("confirmAttachment").addEventListener("click",()=>{
-    if(busy) return;
-    persistPreview();
-    const accepted=entries.filter(item=>item.checked);
-    if(!accepted.length) return;
-    const texts=accepted.filter(item=>item.result.kind==="text");
-    const images=accepted.filter(item=>item.result.kind==="image");
-    if(images.length + imageCount() > 1) {
-      byId("attachmentNotice").textContent = "Uma imagem por mensagem. Remova a imagem já preparada antes de adicionar outra.";
-      return;
-    }
-    if(texts.some(item=>!item.content.trim() || item.content.length>12000) ||
-        texts.reduce((n,item)=>n+item.content.length,0)>60000)
-      return message("system","O contexto aceita até 60.000 caracteres no total e 12.000 por arquivo. Reduza os trechos ou desmarque arquivos; nada foi descartado.");
-    if(originals.reduce((n,item)=>n+item.file.size,0) + accepted.reduce((n,item)=>n+item.file.size,0)>20_000_000)
-      return message("system","Os originais desta sessão atingiram 20 MB. Inicie outro chat para adicionar mais.");
-    try { addContexts(texts.map(item=>({source:"Arquivo: "+item.path,content:item.content}))); }
-    catch(error) { return message("system",error.message); }
-    for(const item of images) addImage({name:item.path,dataUrl:item.dataUrl});
-    originals.push(...accepted);
-    entries=[]; selected=-1; overlay.classList.remove("show"); render();
-    byId("inputField").focus();
-  });
+  camera.addEventListener("change",()=>{choose(camera.files); camera.value="";});
+  document.addEventListener("click", event=>{ if(!menu.hidden && !menu.contains(event.target)) setMenu(false); });
+  document.addEventListener("keydown", event=>{ if(event.key === "Escape") setMenu(false); });
   byId("inputForm").addEventListener("paste", event=>{
     if(!getAccount()) return;
     const items=[...(event.clipboardData?.items || [])].filter(item=>item.kind==="file" && item.type.startsWith("image/"));
@@ -184,9 +173,8 @@ window.installAttachments = function({api, message, getAccount, addContexts, add
     } catch(error) { message("system","Não foi possível ler a pasta: "+error.message); }
   });
   function reset() {
-    generation++; busy=false; entries=[]; originals=[]; selected=-1;
+    generation++; setBusy(false); originals=[]; setMenu(false);
     for(const url of urls) URL.revokeObjectURL(url); urls.clear();
-    overlay.classList.remove("show"); preview.value=""; image.removeAttribute("src"); render();
   }
   window.addEventListener("oraculo:account",reset);
   return {

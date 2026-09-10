@@ -252,6 +252,10 @@ def test_attachment_preview_stays_local(tmp_path):
             )
             assert preview.status_code == 200
             assert preview.json()["sent_to_ai"] is False
+            interface = client.get("/").text
+            assert 'id="attachmentMenu"' in interface
+            assert "Arquivos e imagens" in interface
+            assert 'id="attachmentOverlay"' not in interface
             assert client.get("/api/extensions").status_code == 200
     finally:
         server.shutdown()

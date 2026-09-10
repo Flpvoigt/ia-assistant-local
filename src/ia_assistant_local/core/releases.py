@@ -89,7 +89,8 @@ def _snapshot(root: Path) -> dict:
     digest = hashlib.sha256(head.encode())
     for name in sorted(paths):
         if name not in ALLOWED_ROOT and not (
-            name.startswith(("src/", "tests/", "docs/")) and Path(name).suffix.lower() in SUFFIXES
+            name.startswith(("src/", "tests/", "docs/", "browser-extension/"))
+            and Path(name).suffix.lower() in SUFFIXES
         ):
             raise ValueError(f"Arquivo fora da lista de lançamento: {name}. Revise-o manualmente.")
         path = root / name

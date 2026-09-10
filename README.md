@@ -186,7 +186,7 @@ adicionar ferramentas.
 - Conversão local: /pdf nome-do-arquivo, /pdf todos ou
   “converta este arquivo para PDF”. Suporta texto/código, DOCX, PNG, JPG, WebP e PDF.
   DOCX exporta o texto, sem preservar tabelas, imagens ou diagramação original;
-  HTML é convertido como código, não como página renderizada. Não há OCR.
+  HTML é convertido como código, não como página renderizada.
 - A conversão usa o original, não o trecho resumido, com limite de 200.000 caracteres
   ou 20 megapixels. Originais e downloads ficam somente na sessão do navegador;
   ao trocar de conversa, sair ou recarregar, anexe novamente. Conversões locais
@@ -213,3 +213,29 @@ novidades informadas no lançamento. Há botão para pular a animação e suport
 movimento reduzido. A conclusão é lembrada por conta, versão e navegador; limpar
 os dados do navegador ou entrar em outro dispositivo pode mostrar o guia novamente.
 Nada é publicado apenas por instalar esta melhoria.
+
+## Memória protegida, OCR e tarefas
+
+- Se uma nova memória usar a mesma chave de uma informação diferente, o Oráculo
+  mantém a versão atual e abre uma contradição em **Gerenciar memórias**. O usuário
+  escolhe explicitamente qual versão permanece.
+- **Cofre privado** usa AES-GCM e uma chave derivada da senha informada. A senha não
+  é salva, apenas os nomes dos itens aparecem bloqueados e o texto descriptografado
+  some da tela após 60 segundos. O cofre nunca é incluído automaticamente no
+  contexto da IA. Perder a senha significa perder o acesso ao conteúdo.
+- Documentos a partir de 750 KB são extraídos na fila. Abra **Tarefas** no perfil
+  para acompanhar, cancelar ou revisar o resultado antes de anexá-lo ao chat.
+- Em imagens anexadas, use **OCR** para extrair texto em segundo plano. A câmera do
+  celular está disponível em **+ → Usar câmera**.
+- A biblioteca Python de OCR é instalada pelo requirements.txt, mas o mecanismo
+  Tesseract também precisa existir no computador. No macOS, use
+  **brew install tesseract tesseract-lang**. Sem ele, imagens ainda podem ser
+  anexadas normalmente e o painel mostra que o OCR local está indisponível.
+
+## Web Clipper
+
+A pasta **browser-extension** contém uma extensão local para Chrome e Edge. Abra a
+página de extensões do navegador, ative o modo do desenvolvedor, escolha
+**Carregar sem compactação** e selecione essa pasta. Ela captura seleção, texto
+visível ou uma imagem da aba e abre uma revisão no Oráculo. O conteúdo só é
+anexado depois da confirmação e nunca é enviado diretamente ao modelo.
