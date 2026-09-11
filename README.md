@@ -17,7 +17,7 @@ ferramentas, validacao de argumentos e confirmacao humana.
 
 ## Requisitos
 
-- Python 3.11 ou superior;
+- Python 3.11, 3.12 ou 3.13;
 - uma chave de API do Groq;
 - Home Assistant e token de longa duracao somente para integrar a casa.
 
@@ -75,7 +75,7 @@ Abra o arquivo `.env`, preencha `GROQ_API_KEY` com a chave pessoal e inicie:
 bash start.sh
 ```
 
-O Oráculo exige Python 3.11 ou superior. No macOS, o ambiente virtual usa
+O Oráculo exige Python 3.11, 3.12 ou 3.13. No macOS, o ambiente virtual usa
 `.venv/bin`; caminhos `.venv\Scripts` e arquivos `.ps1` são exclusivos do Windows.
 Se o Terminal estiver fora da pasta do projeto, use `cd` até a pasta
 `ia-assistant-local` antes dos comandos.
@@ -95,6 +95,11 @@ grava historico nem memorias, uma sala compartilhada entre os tres criadores,
 pesquisa global, painel de saude do sistema e paineis de artefatos para blocos de
 codigo, tabelas e checklists. A lista permitida de modelos pode ser ajustada em
 `GROQ_MODELS`; somente modelos incluidos nela sao aceitos pelo servidor.
+
+O botao de microfone abre a conversa por voz em portugues: o navegador escuta a
+frase, envia ao Oraculo e le a resposta em voz alta. Nao exige outra chave paga,
+pois usa reconhecimento e sintese oferecidos pelo navegador. Fora de `localhost`,
+o navegador pode exigir HTTPS para liberar o microfone.
 
 Respostas do Oraculo sao exibidas com Markdown seguro: titulos, listas, tabelas,
 links, checklists e blocos de codigo com botao para copiar. O conteudo gerado nao
@@ -173,6 +178,30 @@ python -m ruff format --check .
 
 Leia `CONTRIBUTING.md`, `docs/ARCHITECTURE.md` e `SECURITY.md` antes de
 adicionar ferramentas.
+
+## Voz profissional local
+
+O Oráculo usa o Kokoro ONNX com a voz masculina `pm_alex` para responder em
+português brasileiro. A síntese roda no próprio computador, sem chave de API e
+sem cobrança por fala. Se o mecanismo ou o modelo estiver indisponível, a
+interface troca automaticamente para a voz instalada no navegador.
+
+`install.ps1` no Windows e `bash install.sh` no macOS/Linux instalam a biblioteca
+e baixam uma vez os arquivos do modelo para `data/kokoro/`. O modelo INT8 ocupa
+cerca de 88 MB e não entra no Git. Quando o F32 já existe, o modo automático o
+prefere porque ele pode ser mais rápido em algumas CPUs; o INT8 continua como
+alternativa leve. Defina `ORACULO_VOICE_MODEL=int8` no `.env` para forçar o modelo
+menor ou `ORACULO_VOICE_MODEL=f32` para forçar o modelo completo. Quem já possui o
+projeto pode atualizar apenas a voz:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m ia_assistant_local.core.voice --install
+```
+
+No macOS/Linux, substitua o executável por `.venv/bin/python`. O estado e o teste
+de reprodução aparecem em **Painel do dev-chefe → Testes**. Respostas maiores são
+geradas e reproduzidas em partes, reduzindo a espera antes do início da fala.
 # Anexos, pastas e PDF
 
 - Use o botão + para escolher vários arquivos ou uma pasta com subpastas. Também é

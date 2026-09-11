@@ -1,5 +1,5 @@
 {
-  "version": "2.0",
+  "version": "2.5",
   "published": true,
   "notes": [
     "Detector de contradições com escolha da memória correta",
@@ -8,6 +8,8 @@
     "OCR local de imagens e captura pela câmera do celular",
     "Web Clipper para páginas, seleções e capturas de tela",
     "Novo painel de configurações organizado por área",
+    "Central do dev-chefe com métricas, permissões e auditoria",
+    "Apresentação cinematográfica 3D com identidade do Oráculo",
     "Guia de novidades paginado, responsivo e sem scrollbar"
   ]
 }

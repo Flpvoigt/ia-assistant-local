@@ -1,16 +1,18 @@
+import json
 import threading
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import httpx
 
+from ia_assistant_local.core.config import PROJECT_ROOT
 from ia_assistant_local.core.memory import MemoryStore
+from ia_assistant_local.core.releases import release_info
 from ia_assistant_local.web.server import (
     CONFIDENTIALITY_REPLY,
     AssistantServer,
     is_internal_details_request,
 )
-from ia_assistant_local.core.config import PROJECT_ROOT
-from ia_assistant_local.core.releases import release_info
 
 
 class DummyAgent:
@@ -73,6 +75,8 @@ def test_chat_isolation_and_owner_audit(tmp_path):
     try:
         with httpx.Client(base_url=base_url, trust_env=False) as will:
             assert will.get("/api/usage").status_code == 401
+            assert will.get("/api/voice/status").status_code == 401
+            assert will.post("/api/voice/synthesize", json={"text": "Olá"}).status_code == 403
             assert (
                 will.post("/api/admin/release/prepare", json={"notes": ["Teste"]}).status_code
                 == 403
@@ -83,6 +87,23 @@ def test_chat_isolation_and_owner_audit(tmp_path):
                 json={"username": "will", "password": credentials["will"]},
             )
             assert login.status_code == 200
+            voice_state = will.get("/api/voice/status")
+            assert voice_state.status_code == 200
+            assert voice_state.json()["voice"] == "pm_alex"
+            with patch("ia_assistant_local.web.server.synthesize_voice", return_value=b"RIFFaudio"):
+                spoken = will.post("/api/voice/synthesize", json={"text": "Olá"})
+            assert spoken.status_code == 200
+            assert spoken.json()["voice"] == "pm_alex"
+            assert spoken.json()["audio"] == "UklGRmF1ZGlv"
+            with patch(
+                "ia_assistant_local.web.server.synthesize_voice_chunks",
+                return_value=iter([b"RIFFone", b"RIFFtwo"]),
+            ):
+                streamed = will.post("/api/voice/stream", json={"text": "Olá"})
+            assert streamed.status_code == 200
+            stream_lines = [json.loads(line) for line in streamed.text.splitlines()]
+            assert [line["index"] for line in stream_lines] == [0, 1]
+            assert all(line["model"] in {"int8", "f32"} for line in stream_lines)
             changed = will.post(
                 "/api/change-password",
                 json={
@@ -228,7 +249,7 @@ def test_temporary_chat_is_not_saved_and_model_is_selected(tmp_path):
             models = client.get("/api/models").json()
             assert models["version"] == release_info(PROJECT_ROOT)["version"]
             assert all(
-                item["label"].startswith(f'Oráculo {models["version"]} · ')
+                item["label"].startswith(f"Oráculo {models['version']} · ")
                 for item in models["models"]
             )
     finally:
@@ -264,6 +285,18 @@ def test_attachment_preview_stays_local(tmp_path):
             assert 'id="attachmentMenu"' in interface
             assert "Arquivos e imagens" in interface
             assert 'id="attachmentOverlay"' not in interface
+            assert 'id="voiceBtn"' in interface
+            assert 'src="/voice-ui.js"' in interface
+            assert 'data-admin-view="tests"' in interface
+            assert 'id="voiceTestSpeak"' in interface
+            voice_script = client.get("/voice-ui.js")
+            assert voice_script.status_code == 200
+            assert "SpeechRecognition" in voice_script.text
+            assert "OraculoVoice" in voice_script.text
+            assert "pm_alex" in voice_script.text
+            assert "/api/voice/stream" in voice_script.text
+            assert "voice-history" in voice_script.text
+            assert "voice-mute" in voice_script.text
             assert client.get("/api/extensions").status_code == 200
     finally:
         server.shutdown()

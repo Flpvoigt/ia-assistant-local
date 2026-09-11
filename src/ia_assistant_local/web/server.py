@@ -27,6 +27,7 @@ from ..core.pdf_export import convert_to_pdf
 from ..core.releases import prepare_release, publish_release, release_info
 from ..core.updater import apply_update, update_status
 from ..core.vault import decrypt_secret, encrypt_secret
+from ..core.voice import synthesize_voice, synthesize_voice_chunks, voice_status, warm_voice
 from ..integrations.extensions import extension_catalog
 from ..integrations.home_assistant import HomeAssistantClient
 from ..integrations.tools import ToolRegistry
@@ -141,7 +142,12 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 f"{COOKIE_NAME}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
             )
         self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+            # O navegador pode cancelar uma síntese de voz enquanto ela ainda
+            # está sendo gerada. A resposta deixa de ser necessária nesse caso.
+            return
 
     def _read_json(self) -> dict:
         if not self.headers.get("Content-Type", "").startswith("application/json"):
@@ -153,6 +159,36 @@ class AssistantHandler(BaseHTTPRequestHandler):
         if not isinstance(payload, dict):
             raise TypeError("O corpo da requisição deve ser um objeto.")
         return payload
+
+    def _send_voice_stream(self, chunks) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Connection", "close")
+        self._security_headers()
+        self.end_headers()
+        model_variant = voice_status().get("model_variant", "local")
+        try:
+            for index, audio in enumerate(chunks):
+                line = (
+                    json.dumps(
+                        {
+                            "index": index,
+                            "audio": base64.b64encode(audio).decode("ascii"),
+                            "mime_type": "audio/wav",
+                            "voice": "pm_alex",
+                            "model": model_variant,
+                        },
+                        ensure_ascii=False,
+                    ).encode("utf-8")
+                    + b"\n"
+                )
+                self.wfile.write(line)
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+            pass
+        finally:
+            self.close_connection = True
 
     def _session_token(self) -> str | None:
         cookie = SimpleCookie(self.headers.get("Cookie", ""))
@@ -205,6 +241,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
             "/release-ui.js": ("release-ui.js", "application/javascript; charset=utf-8"),
             "/attachments-ui.js": ("attachments-ui.js", "application/javascript; charset=utf-8"),
             "/features-ui.js": ("features-ui.js", "application/javascript; charset=utf-8"),
+            "/voice-ui.js": ("voice-ui.js", "application/javascript; charset=utf-8"),
             "/features-ui.css": ("features-ui.css", "text/css; charset=utf-8"),
             "/mascot.js": ("mascot.js", "application/javascript; charset=utf-8"),
             "/desktop-ui.css": ("desktop-ui.css", "text/css; charset=utf-8"),
@@ -230,6 +267,13 @@ class AssistantHandler(BaseHTTPRequestHandler):
         if path == "/api/me":
             try:
                 self._send_json(200, {"user": self._require_user()})
+            except PermissionError as exc:
+                self._send_json(401, {"error": str(exc)})
+            return
+        if path == "/api/voice/status":
+            try:
+                self._require_user()
+                self._send_json(200, voice_status())
             except PermissionError as exc:
                 self._send_json(401, {"error": str(exc)})
             return
@@ -499,6 +543,34 @@ class AssistantHandler(BaseHTTPRequestHandler):
             if self.path == "/api/logout":
                 self.server.memory.logout(self._session_token())
                 self._send_json(200, {"ok": True}, clear_cookie=True)
+                return
+            if self.path == "/api/voice/synthesize":
+                self._require_user()
+                payload = self._read_json()
+                try:
+                    audio = synthesize_voice(str(payload.get("text", "")))
+                except RuntimeError as exc:
+                    self._send_json(503, {"error": str(exc), "fallback": "browser"})
+                    return
+                self._send_json(
+                    200,
+                    {
+                        "audio": base64.b64encode(audio).decode("ascii"),
+                        "mime_type": "audio/wav",
+                        "engine": "kokoro-onnx",
+                        "voice": "pm_alex",
+                    },
+                )
+                return
+            if self.path == "/api/voice/stream":
+                self._require_user()
+                payload = self._read_json()
+                try:
+                    chunks = synthesize_voice_chunks(str(payload.get("text", "")))
+                except RuntimeError as exc:
+                    self._send_json(503, {"error": str(exc), "fallback": "browser"})
+                    return
+                self._send_voice_stream(chunks)
                 return
             if self.path == "/api/change-password":
                 user = self._require_user()
@@ -1140,6 +1212,10 @@ def run_server() -> None:
             print(f"  {username}: {password}")
         print()
     print(f"Interface: {url}")
+    if voice_status()["ready"]:
+        variant = voice_status().get("model_variant", "local")
+        print(f"Voz local: Kokoro {variant} pm_alex (preparando em segundo plano)")
+        threading.Thread(target=warm_voice, daemon=True, name="oraculo-voice-warmup").start()
     print("Pressione Ctrl+C para encerrar.")
     threading.Timer(0.5, lambda: webbrowser.open(url)).start()
     try:

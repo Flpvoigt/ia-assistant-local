@@ -1104,6 +1104,9 @@
         <input type="file" id="attachmentInput" multiple hidden accept=".docx,.pdf,.txt,.md,.csv,.json,.yaml,.yml,.xml,.html,.css,.js,.ts,.py,.java,.c,.cpp,.h,.sql,.log,image/png,image/jpeg,image/webp">
       </div>
       <input id="inputField" autocomplete="off" placeholder="Pergunte ao Oráculo…" />
+      <button type="button" class="voice-btn" id="voiceBtn" aria-label="Conversar por voz" title="Conversar por voz">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"></path></svg>
+      </button>
       <button type="submit" id="sendBtn" aria-label="Enviar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
       </button>
@@ -1247,6 +1250,7 @@
       <button type="button" data-admin-view="overview" aria-pressed="true">Visão geral</button>
       <button type="button" data-admin-view="team">Equipe e acessos</button>
       <button type="button" data-admin-view="audit">Auditoria</button>
+      <button type="button" data-admin-view="tests">Testes</button>
     </nav>
     <div class="admin-body">
       <section class="admin-view" id="admin-view-overview">
@@ -1271,6 +1275,21 @@
         <header class="admin-section-head"><div><small>VALIDAÇÃO DE TESTES</small><h3>Auditoria de conversas</h3><p>Consulte interações da equipe para investigar erros e validar o comportamento do Oráculo.</p></div></header>
         <div class="admin-audit-layout"><div class="audit-list" id="auditList"></div><div class="audit-content" id="auditContent"><div class="admin-empty">Selecione uma conversa para inspecionar.</div></div></div>
       </section>
+      <section class="admin-view" id="admin-view-tests" hidden>
+        <header class="admin-section-head"><div><small>LABORATÓRIO LOCAL</small><h3>Testes do Oráculo</h3><p>Valide recursos no seu navegador sem afetar conversas ou dados da equipe.</p></div></header>
+        <div class="admin-test-status-grid">
+          <article><small>SAÍDA DE VOZ</small><strong id="voiceSynthesisState">Verificando…</strong><span>Kokoro local · pm_alex</span></article>
+          <article><small>MICROFONE</small><strong id="voiceRecognitionState">Verificando…</strong><span>Reconhecimento em português</span></article>
+          <article><small>CONTEXTO</small><strong id="voiceSecurityState">Verificando…</strong><span>Permissão segura do navegador</span></article>
+        </div>
+        <div class="admin-test-card">
+          <div class="admin-test-copy"><span class="admin-badge">TESTE SEM MICROFONE</span><h3>Voz do Oráculo</h3><p>Digite qualquer frase ou use o texto padrão. Este teste apenas reproduz a voz e não cria mensagem, conversa ou memória.</p></div>
+          <label for="voiceTestText">Frase de teste</label>
+          <textarea id="voiceTestText" maxlength="500">Olá, Felipe. Eu sou o Oráculo. O sistema de voz está funcionando corretamente.</textarea>
+          <div class="admin-test-actions"><button type="button" class="btn primary" id="voiceTestSpeak">Ouvir voz</button><button type="button" class="btn" id="voiceTestStop">Parar áudio</button><button type="button" class="btn" id="voiceTestConversation">Abrir conversa por voz</button></div>
+          <p class="permission-message" id="voiceTestStatus" role="status"></p>
+        </div>
+      </section>
     </div>
   </div>
 </div>
@@ -1280,6 +1299,7 @@
 <script src="/release-ui.js"></script>
 <script src="/attachments-ui.js"></script>
 <script src="/features-ui.js"></script>
+<script src="/voice-ui.js"></script>
 <script>
 (function(){
   "use strict";
@@ -2892,7 +2912,35 @@
     button.addEventListener("click",()=>{
       document.querySelectorAll("[data-admin-view]").forEach(item=>item.setAttribute("aria-pressed",String(item===button)));
       document.querySelectorAll(".admin-view").forEach(view=>view.hidden=view.id!=="admin-view-"+button.dataset.adminView);
+      if(button.dataset.adminView==="tests") refreshVoiceTests();
     });
+  });
+  async function refreshVoiceTests(){
+    const voice=window.OraculoVoice;
+    const info=await voice?.status?.();
+    document.getElementById("voiceSynthesisState").textContent=info?.ready?"pm_alex pronta":(voice?.capabilities.synthesis?"Reserva do navegador":"Indisponível");
+    document.getElementById("voiceRecognitionState").textContent=voice?.capabilities.recognition?"Disponível":"Indisponível";
+    document.getElementById("voiceSecurityState").textContent=voice?.capabilities.secure?"Protegido":"Requer HTTPS";
+  }
+  document.getElementById("voiceTestSpeak").addEventListener("click",()=>{
+    const text=document.getElementById("voiceTestText").value.trim();
+    const status=document.getElementById("voiceTestStatus");
+    if(!text) return status.textContent="Digite uma frase para testar.";
+    status.textContent=window.OraculoVoice?.preview(text)?"Reproduzindo a voz do Oráculo…":"Síntese de voz indisponível neste navegador.";
+  });
+  document.getElementById("voiceTestStop").addEventListener("click",()=>{
+    window.OraculoVoice?.stopSpeech();
+    document.getElementById("voiceTestStatus").textContent="Reprodução interrompida.";
+  });
+  document.getElementById("voiceTestConversation").addEventListener("click",()=>{
+    adminOverlay.classList.remove("show");
+    window.OraculoVoice?.open();
+  });
+  window.addEventListener("oraculo:voice-preview-status",event=>{
+    const status=document.getElementById("voiceTestStatus");
+    if(event.detail?.state==="loading") status.textContent="Gerando voz local…";
+    if(event.detail?.state==="done") status.textContent=event.detail.engine==="pm_alex"?"Teste concluído com Kokoro pm_alex.":"Teste concluído com a voz reserva do navegador.";
+    if(event.detail?.state==="error") status.textContent="Não foi possível reproduzir a voz.";
   });
   document.querySelectorAll("[data-admin-shortcut]").forEach(button=>{
     button.addEventListener("click", ()=>{
@@ -3121,6 +3169,7 @@
     if(explainProblem(text)) return;
     if(await attachmentManager.handle(text)) return;
     thinking = true;
+    window.dispatchEvent(new CustomEvent("oraculo:voice-state",{detail:{state:"processing"}}));
     haloEl.classList.add("active");
     setStage("Analisando a solicitação…");
     const stageContext = window.setTimeout(()=>setStage("Preparando contexto autorizado…"), 550);
@@ -3156,6 +3205,7 @@
         sender:currentMode === "shared" ? "Oráculo" : ""
       });
       await rendered.typingDone;
+      window.dispatchEvent(new CustomEvent("oraculo:voice-reply",{detail:{text:reply}}));
       if(currentMode === "temporary"){
         temporaryHistory.push(
           {role:"user", content:text},
@@ -3182,6 +3232,7 @@
       setOnline(false);
       pending.parentElement?.remove();
       addMessage("system", "Não foi possível obter resposta: " + err.message);
+      window.dispatchEvent(new CustomEvent("oraculo:voice-state",{detail:{state:"error",message:err.message}}));
     }finally{
       window.clearTimeout(stageContext);
       window.clearTimeout(stageModel);
@@ -3218,6 +3269,11 @@
       return;
     }
     enqueueMessage(text);
+  });
+
+  window.addEventListener("oraculo:voice-submit", event=>{
+    const text=String(event.detail?.text||"").trim();
+    if(text) enqueueMessage(text);
   });
 
   if("serviceWorker" in navigator){

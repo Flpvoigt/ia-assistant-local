@@ -9,6 +9,8 @@ if (-not (Test-Path -LiteralPath ".venv\Scripts\python.exe")) {
 }
 
 $python = ".venv\Scripts\python.exe"
+& $python -c "import sys; raise SystemExit(0 if (3, 11) <= sys.version_info[:2] < (3, 14) else 'O Oraculo exige Python 3.11, 3.12 ou 3.13.')"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host "Preparando o pip..."
 & $python -m ensurepip --upgrade
 & $python -m pip install --upgrade pip
@@ -16,6 +18,13 @@ Write-Host "Preparando o pip..."
 Write-Host "Instalando dependencias..."
 & $python -m pip install -r requirements.txt
 & $python -m pip install -e .
+
+Write-Host "Instalando a voz local Kokoro pm_alex..."
+& $python -m ia_assistant_local.core.voice --install
+if ($LASTEXITCODE -ne 0) {
+    Write-Warning "A voz profissional não foi instalada. O Oráculo usará a voz do navegador até você tentar novamente."
+    $global:LASTEXITCODE = 0
+}
 
 if (-not (Test-Path -LiteralPath ".env")) {
     Copy-Item -LiteralPath ".env.example" -Destination ".env"
