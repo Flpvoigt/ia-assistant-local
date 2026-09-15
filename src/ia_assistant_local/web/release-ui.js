@@ -12,7 +12,7 @@
   const close=()=>{if(publishing)return;clearTimeout(timer);stopCinema();dialog.close();dialog.replaceChildren();};
   dialog.addEventListener("cancel",event=>{if(publishing)event.preventDefault();else clearTimeout(timer);});
   function launch(){
-    if(user?.role!=="owner" || user.username!=="felipe")return;
+    if(!user?.admin_access)return;
     dialog.className="release-dialog";
     dialog.innerHTML='<header><h2>Lançar nova versão</h2><button type="button" class="release-close" aria-label="Fechar">×</button></header><p>Cria um commit e envia para a main do origin. Não atualiza automaticamente os computadores da equipe.</p><label>Novidades para o guia (uma por linha)<textarea id="releaseNotes" rows="6" maxlength="2880"></textarea></label><button type="button" class="btn" id="releasePrepare">Verificar lançamento</button><pre id="releasePreview"></pre><label class="profile-toggle" id="releaseConsent" hidden><input type="checkbox" id="releaseReviewed"> Revisei os arquivos no editor, as novidades e o destino. Autorizo o commit e o push.</label><button type="button" class="btn primary" id="releasePublish" hidden>Confirmar lançamento</button><p id="releaseStatus" role="status"></p>';
     dialog.querySelector(".release-close").onclick=close;
@@ -151,7 +151,7 @@
   window.addEventListener("oraculo:account",async event=>{
     const turn=++epoch;user=event.detail.user;
     clearInterval(releasePoll);releasePoll=0;
-    button.hidden=!(user?.role==="owner" && user.username==="felipe");
+    button.hidden=!user?.admin_access;
     if(!publishing)close();
     if(!user || user.must_change_password)return;
     await checkRelease(turn);

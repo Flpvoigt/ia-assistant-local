@@ -1243,7 +1243,7 @@
 <div class="modal-overlay" id="adminOverlay">
   <div class="modal admin-console">
     <header class="admin-console-head">
-      <div><span class="admin-eyebrow">ACESSO EXCLUSIVO · FELIPE</span><h2>Central do dev-chefe</h2><p>Controle operacional, equipe e validação em um só lugar.</p></div>
+      <div><span class="admin-eyebrow">ACESSO AUTORIZADO</span><h2>Central do dev-chefe</h2><p>Controle operacional, equipe e validação em um só lugar.</p></div>
       <button type="button" id="closeAdmin" class="admin-close" aria-label="Fechar">×</button>
     </header>
     <nav class="admin-nav" aria-label="Áreas administrativas">
@@ -1267,7 +1267,7 @@
         <div class="admin-principle"><span>◈</span><div><strong>Controle local e transparente</strong><p>As ações administrativas são validadas pelo servidor. Nenhuma permissão é concedida apenas por estar visível nesta tela.</p></div></div>
       </section>
       <section class="admin-view" id="admin-view-team" hidden>
-        <header class="admin-section-head"><div><small>CONTROLE DE ACESSO</small><h3>Equipe e permissões</h3><p>Felipe mantém acesso total; alterações abaixo afetam somente Will e Gustavo.</p></div></header>
+        <header class="admin-section-head"><div><small>CONTROLE DE ACESSO</small><h3>Equipe e permissões</h3><p>Felipe e Will mantêm acesso total; alterações abaixo afetam somente Gustavo.</p></div></header>
         <div class="permission-users" id="permissionUsers"></div>
         <div class="permission-message" id="permissionMessage" role="status"></div>
       </section>
@@ -1285,7 +1285,7 @@
         <div class="admin-test-card">
           <div class="admin-test-copy"><span class="admin-badge">TESTE SEM MICROFONE</span><h3>Voz do Oráculo</h3><p>Digite qualquer frase ou use o texto padrão. Este teste apenas reproduz a voz e não cria mensagem, conversa ou memória.</p></div>
           <label for="voiceTestText">Frase de teste</label>
-          <textarea id="voiceTestText" maxlength="500">Olá, Felipe. Eu sou o Oráculo. O sistema de voz está funcionando corretamente.</textarea>
+          <textarea id="voiceTestText" maxlength="500">Olá. Eu sou o Oráculo. O sistema de voz está funcionando corretamente.</textarea>
           <div class="admin-test-actions"><button type="button" class="btn primary" id="voiceTestSpeak">Ouvir voz</button><button type="button" class="btn" id="voiceTestStop">Parar áudio</button><button type="button" class="btn" id="voiceTestConversation">Abrir conversa por voz</button></div>
           <p class="permission-message" id="voiceTestStatus" role="status"></p>
         </div>
@@ -2049,7 +2049,7 @@
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "chat-delete";
-      remove.textContent = "×";
+      remove.textContent = "卐";
       remove.title = "Excluir conversa";
       remove.addEventListener("click", async ()=>{
         if(!window.confirm("Excluir esta conversa permanentemente?")) return;
@@ -2844,7 +2844,7 @@
   }
 
   async function openAdminPanel(){
-    if(!currentAccount || currentAccount.role !== "owner") return;
+    if(!currentAccount?.admin_access) return;
     adminOverlay.classList.add("show");
     document.querySelector('[data-admin-view="overview"]').click();
     auditContent.innerHTML = '<div class="admin-empty">Selecione uma conversa para inspecionar.</div>';
@@ -3116,7 +3116,7 @@
     const name = (separator < 0 ? clean : clean.slice(0,separator)).toLowerCase();
     const args = separator < 0 ? "" : clean.slice(separator + 1).trim();
     if(name === "/adm"){
-      if(currentAccount && currentAccount.role === "owner") await openAdminPanel();
+      if(currentAccount?.admin_access) await openAdminPanel();
       else addMessage("system", "Comando indisponível para este perfil.");
       return true;
     }

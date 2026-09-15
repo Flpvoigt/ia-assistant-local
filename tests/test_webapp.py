@@ -87,6 +87,8 @@ def test_chat_isolation_and_owner_audit(tmp_path):
                 json={"username": "will", "password": credentials["will"]},
             )
             assert login.status_code == 200
+            assert login.json()["user"]["role"] == "admin"
+            assert login.json()["user"]["admin_access"] is True
             voice_state = will.get("/api/voice/status")
             assert voice_state.status_code == 200
             assert voice_state.json()["voice"] == "pm_alex"
@@ -112,9 +114,33 @@ def test_chat_isolation_and_owner_audit(tmp_path):
                 },
             )
             assert changed.status_code == 200
-            assert (
-                will.post("/api/admin/release/publish", json={"confirmed": True}).status_code == 403
-            )
+            with patch(
+                "ia_assistant_local.web.server.prepare_release",
+                return_value={
+                    "version": "3.0",
+                    "notes": ["Teste"],
+                    "files": [],
+                    "branch": "main",
+                    "remote": "origin",
+                    "token": "plan",
+                },
+            ):
+                prepared = will.post("/api/admin/release/prepare", json={"notes": ["Teste"]})
+            assert prepared.status_code == 200
+            with patch(
+                "ia_assistant_local.web.server.publish_release",
+                return_value={
+                    "published": True,
+                    "version": "3.0",
+                    "commit": "abc",
+                    "message": "ok",
+                },
+            ):
+                published = will.post(
+                    "/api/admin/release/publish",
+                    json={"confirmed": True, "token": "plan"},
+                )
+            assert published.status_code == 200
             pdf = will.post(
                 "/api/attachments/pdf",
                 json={"name": "teste.txt", "mime_type": "text/plain", "data": "T2xh"},
@@ -129,7 +155,7 @@ def test_chat_isolation_and_owner_audit(tmp_path):
             own_usage = will.get("/api/usage").json()
             assert own_usage["requests_24h"] == 1
             assert own_usage["remaining"] is None
-            assert will.get("/api/admin/chats").status_code == 403
+            assert will.get("/api/admin/chats").status_code == 200
 
         with httpx.Client(base_url=base_url, trust_env=False) as felipe:
             login = felipe.post(
@@ -147,11 +173,12 @@ def test_chat_isolation_and_owner_audit(tmp_path):
             own_permissions = felipe.get("/api/permissions")
             assert all(own_permissions.json()["permissions"].values())
             team = felipe.get("/api/admin/permissions").json()
-            will_user = next(user for user in team["users"] if user["username"] == "will")
+            assert {user["username"] for user in team["users"]} == {"gustavo"}
+            gustavo_user = team["users"][0]
             restricted = {key: False for key in team["labels"]}
             restricted["system_info"] = True
             updated = felipe.put(
-                f"/api/admin/users/{will_user['id']}/permissions",
+                f"/api/admin/users/{gustavo_user['id']}/permissions",
                 json={"permissions": restricted},
             )
             assert updated.status_code == 200
@@ -163,7 +190,7 @@ def test_chat_isolation_and_owner_audit(tmp_path):
                 json={"username": "will", "password": "senha-segura-will"},
             )
             assert login.status_code == 200
-            assert will.get("/api/memories").status_code == 403
+            assert will.get("/api/memories").status_code == 200
     finally:
         server.shutdown()
         server.server_close()
@@ -289,6 +316,7 @@ def test_attachment_preview_stays_local(tmp_path):
             assert 'src="/voice-ui.js"' in interface
             assert 'data-admin-view="tests"' in interface
             assert 'id="voiceTestSpeak"' in interface
+            assert "if(currentAccount?.admin_access) await openAdminPanel();" in interface
             voice_script = client.get("/voice-ui.js")
             assert voice_script.status_code == 200
             assert "SpeechRecognition" in voice_script.text
@@ -297,6 +325,10 @@ def test_attachment_preview_stays_local(tmp_path):
             assert "/api/voice/stream" in voice_script.text
             assert "voice-history" in voice_script.text
             assert "voice-mute" in voice_script.text
+            profile_script = client.get("/profile.js").text
+            assert 'account.username!=="will"' in profile_script
+            release_script = client.get("/release-ui.js").text
+            assert "button.hidden=!user?.admin_access" in release_script
             assert client.get("/api/extensions").status_code == 200
     finally:
         server.shutdown()

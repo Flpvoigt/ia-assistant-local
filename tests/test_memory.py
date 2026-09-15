@@ -13,6 +13,7 @@ def test_three_admins_are_created_with_isolated_memory(tmp_path):
 
     token, will = store.login("will", credentials["will"])
     assert will["role"] == "admin"
+    assert will["admin_access"] is True
     assert will["must_change_password"] is True
     assert store.current_user(token)["username"] == "will"
 
@@ -37,8 +38,7 @@ def test_three_admins_are_created_with_isolated_memory(tmp_path):
         "Minha mensagem"
     )
 
-    with pytest.raises(PermissionError, match="administrador-chefe"):
-        store.audit_chats(will["id"])
+    assert store.audit_chats(will["id"]) == []
 
 
 def test_invalid_password_is_rejected(tmp_path):
@@ -49,23 +49,25 @@ def test_invalid_password_is_rejected(tmp_path):
         store.login("will", "senha-incorreta")
 
 
-def test_owner_has_permanent_full_access_and_controls_admin_permissions(tmp_path):
+def test_authorized_admins_have_permanent_full_access_and_control_permissions(tmp_path):
     store = MemoryStore(tmp_path / "oraculo.db")
     credentials = dict(store.bootstrap_admins())
     _, will = store.login("will", credentials["will"])
+    _, gustavo = store.login("gustavo", credentials["gustavo"])
     _, felipe = store.login("felipe", credentials["felipe"])
 
+    assert all(store.permissions_for_user(will["id"]).values())
     assert all(store.permissions_for_user(felipe["id"]).values())
     updated = {key: False for key in PERMISSION_LABELS}
     updated["system_info"] = True
-    assert store.update_user_permissions(felipe["id"], will["id"], updated) == updated
-    assert store.has_permission(will["id"], "system_info")
-    assert not store.has_permission(will["id"], "memory_access")
+    assert store.update_user_permissions(will["id"], gustavo["id"], updated) == updated
+    assert store.has_permission(gustavo["id"], "system_info")
+    assert not store.has_permission(gustavo["id"], "memory_access")
 
     with pytest.raises(PermissionError, match="não podem ser reduzidas"):
         store.update_user_permissions(felipe["id"], felipe["id"], updated)
 
-    with pytest.raises(PermissionError, match="administrador-chefe"):
+    with pytest.raises(PermissionError, match="não podem ser reduzidas"):
         store.update_user_permissions(will["id"], will["id"], updated)
 
 

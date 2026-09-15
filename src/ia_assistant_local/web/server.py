@@ -98,11 +98,11 @@ class AssistantServer(ThreadingHTTPServer):
         settings: Settings,
         memory: MemoryStore,
     ):
+        self.tasks = TaskManager()
         super().__init__(address, AssistantHandler)
         self.agent = agent
         self.settings = settings
         self.memory = memory
-        self.tasks = TaskManager()
         self.started_at = time.time()
 
     def server_close(self) -> None:
@@ -167,7 +167,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self._security_headers()
         self.end_headers()
-        model_variant = voice_status().get("model_variant", "local")
+        model_variant = voice_status().get("model_variant") or "int8"
         try:
             for index, audio in enumerate(chunks):
                 line = (
@@ -208,7 +208,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
 
     @staticmethod
     def _require_owner(user: dict) -> None:
-        if user.get("role") != "owner":
+        if not user.get("admin_access"):
             raise PermissionError("Acesso exclusivo do dev-chefe.")
 
     def _send_static(self, name: str, content_type: str) -> None:
@@ -669,9 +669,9 @@ class AssistantHandler(BaseHTTPRequestHandler):
             if self.path in {"/api/admin/release/prepare", "/api/admin/release/publish"}:
                 user = self._require_user()
                 self._require_owner(user)
-                if user.get("username") != "felipe" or user.get("must_change_password"):
+                if user.get("must_change_password"):
                     raise PermissionError(
-                        "Lançamento exclusivo da conta Felipe com senha definitiva."
+                        "Defina uma senha definitiva antes de lançar uma versão."
                     )
                 payload = self._read_json()
                 if self.path.endswith("/prepare"):

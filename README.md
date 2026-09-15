@@ -116,10 +116,12 @@ O painel Extensoes mostra as integracoes implementadas: nucleo local e Home Assi
 O Home Assistant permite consultar estados e controlar luzes e tomadas autorizadas;
 aparece como "configuracao necessaria" enquanto faltar sua configuracao.
 
-Felipe tambem possui o painel Atualizacao segura. A verificacao remota e manual; o
-sistema recusa atualizacoes quando existem mudancas locais e cria uma aprovacao
-separada antes de executar `git pull --ff-only`, com backup consistente do banco.
-Depois de aplicar uma versao nova, reinicie o Oraculo quando o painel solicitar.
+Felipe e Will possuem acesso ao painel Atualizacao segura. No perfil do Will, a
+entrada administrativa permanece oculta e o painel e aberto somente pelo comando
+`/adm`. A verificacao remota e manual; o sistema recusa atualizacoes quando existem
+mudancas locais e cria uma aprovacao separada antes de executar `git pull --ff-only`,
+com backup consistente do banco. Depois de aplicar uma versao nova, reinicie o
+Oraculo quando o painel solicitar.
 
 O projeto inclui manifesto e service worker de PWA. Em `localhost`, navegadores
 compativeis podem oferecer a instalacao no computador. Instalar no celular fora da
@@ -135,16 +137,17 @@ objetivos. Cada fato recebe uma chave estavel: quando o usuario corrige uma
 informacao, a versao anterior e atualizada em vez de gerar uma duplicata. Pedidos
 explicitos para esquecer um fato removem a memoria correspondente.
 
-A conta `felipe` tem o papel `owner` e exibe um painel exclusivo para auditar as
-conversas de `will` e `gustavo` durante validacoes e diagnosticos. Essa permissao
-tambem e validada pelo backend; esconder ou chamar a rota diretamente nao concede
-acesso aos demais usuarios. Os membros da equipe devem estar cientes dessa auditoria.
+Felipe, com papel `owner`, exibe o painel administrativo no perfil. Will conserva o
+papel `admin`, nao ve essa entrada no perfil e abre o mesmo painel somente com
+`/adm`. Os dois acessos sao validados pelo backend e podem auditar as conversas dos
+demais usuarios durante validacoes e diagnosticos. Os membros da equipe devem estar
+cientes dessa auditoria.
 
-No mesmo painel, Felipe pode liberar ou bloquear por usuario o acesso a memorias,
-ao painel de contexto, a informacoes do computador, a abertura de aplicativos e
-as funcoes do Home Assistant. As escolhas ficam salvas no banco local e sao
-validadas pelo servidor antes de cada uso. A conta `felipe` sempre conserva acesso
-total e suas permissoes nao podem ser reduzidas pelo painel ou pela API.
+No mesmo painel, Felipe e Will podem liberar ou bloquear para Gustavo o acesso a
+memorias, ao painel de contexto, a informacoes do computador, a abertura de
+aplicativos e as funcoes do Home Assistant. As escolhas ficam salvas no banco local
+e sao validadas pelo servidor antes de cada uso. Felipe e Will sempre conservam
+acesso total e suas permissoes nao podem ser reduzidas pelo painel ou pela API.
 
 O `.env` nunca deve ser enviado ao Git. Sem os dados do Home Assistant, as
 ferramentas da casa permanecem indisponiveis.
@@ -224,8 +227,9 @@ geradas e reproduzidas em partes, reduzindo a espera antes do início da fala.
   virtual, reinicie o servidor e atualize a página com Ctrl+F5.
 # Lançamentos e boas-vindas
 
-No painel do dev-chefe, **Lançar nova versão** está disponível apenas à conta
-Felipe (owner, com senha definitiva). O servidor também valida essa permissão.
+No painel do dev-chefe, **Lançar nova versão** está disponível para Felipe e Will,
+desde que a conta tenha senha definitiva. Para Will, o painel é aberto com `/adm`;
+a entrada continua oculta no perfil. O servidor também valida essa permissão.
 O primeiro lançamento é 1.5, seguido de 2.0, 2.5 e assim por diante.
 
 Informe as novidades, verifique a prévia e confirme para criar um commit e fazer

@@ -15,6 +15,7 @@ ADMIN_ACCOUNTS = {
     "gustavo": ("Gustavo", "admin"),
     "felipe": ("Felipe", "owner"),
 }
+ADMIN_CONSOLE_ACCOUNTS = frozenset({"felipe", "will"})
 USERNAME_RE = re.compile(r"^[a-z0-9_-]{3,32}$")
 SESSION_SECONDS = 60 * 60 * 24 * 30
 PERMISSION_LABELS = {
@@ -416,6 +417,7 @@ class MemoryStore:
             "username": row["username"],
             "display_name": row["display_name"],
             "role": row["role"],
+            "admin_access": row["username"] in ADMIN_CONSOLE_ACCOUNTS,
             "must_change_password": bool(row["must_change_password"]),
         }
 
@@ -1152,10 +1154,12 @@ class MemoryStore:
 
     def permissions_for_user(self, user_id: int) -> dict[str, bool]:
         with self._connect() as connection:
-            user = connection.execute("SELECT role FROM users WHERE id = ?", (user_id,)).fetchone()
+            user = connection.execute(
+                "SELECT username, role FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
             if user is None:
                 raise PermissionError("Conta não encontrada.")
-            if user["role"] == "owner":
+            if user["role"] == "owner" or user["username"] in ADMIN_CONSOLE_ACCOUNTS:
                 return {key: True for key in PERMISSION_LABELS}
             rows = connection.execute(
                 "SELECT permission, enabled FROM user_permissions WHERE user_id = ?",
@@ -1179,7 +1183,7 @@ class MemoryStore:
                 """
                 SELECT id, username, display_name, role
                 FROM users
-                WHERE role != 'owner'
+                WHERE username NOT IN ('felipe', 'will')
                 ORDER BY display_name
                 """
             ).fetchall()
@@ -1198,11 +1202,11 @@ class MemoryStore:
             raise TypeError("Cada permissão deve ser verdadeira ou falsa.")
         with self._connect() as connection:
             target = connection.execute(
-                "SELECT role FROM users WHERE id = ?", (target_user_id,)
+                "SELECT username, role FROM users WHERE id = ?", (target_user_id,)
             ).fetchone()
             if target is None:
                 raise ValueError("Usuário não encontrado.")
-            if target["role"] == "owner":
+            if target["role"] == "owner" or target["username"] in ADMIN_CONSOLE_ACCOUNTS:
                 raise PermissionError("As permissões do dev-chefe não podem ser reduzidas.")
             connection.executemany(
                 """
@@ -1217,8 +1221,12 @@ class MemoryStore:
 
     def _require_owner(self, user_id: int) -> None:
         with self._connect() as connection:
-            row = connection.execute("SELECT role FROM users WHERE id = ?", (user_id,)).fetchone()
-        if row is None or row["role"] != "owner":
+            row = connection.execute(
+                "SELECT username, role FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
+        if row is None or not (
+            row["role"] == "owner" or row["username"] in ADMIN_CONSOLE_ACCOUNTS
+        ):
             raise PermissionError("Acesso exclusivo do administrador-chefe.")
 
     def audit_chats(self, owner_id: int) -> list[dict]:
