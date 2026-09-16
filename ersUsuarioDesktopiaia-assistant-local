@@ -1,0 +1,16 @@
+warning: in the working copy of '.gitignore', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/ARCHITECTURE.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'pyproject.toml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ia_assistant_local/ai/agent.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ia_assistant_local/core/config.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ia_assistant_local/core/memory.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ia_assistant_local/core/voice.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ia_assistant_local/web/interface.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ia_assistant_local/web/profile.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ia_assistant_local/web/server.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ia_assistant_local/web/voice-ui.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_agent.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_memory.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_voice.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_webapp.py', LF will be replaced by CRLF the next time Git touches it

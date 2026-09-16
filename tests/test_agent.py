@@ -1,8 +1,9 @@
+import json
 from unittest.mock import Mock, patch
 
 import pytest
 
-from ia_assistant_local.ai.agent import LocalAgent
+from ia_assistant_local.ai.agent import SYSTEM_PROMPT, LocalAgent
 
 
 def test_groq_chat_uses_server_side_api_key():
@@ -52,13 +53,17 @@ def test_memory_extraction_accepts_structured_updates():
         ]
     }
 
-    with patch("ia_assistant_local.ai.agent.httpx.post", return_value=response):
+    with patch("ia_assistant_local.ai.agent.httpx.post", return_value=response) as post:
         memories = LocalAgent(
             "https://api.groq.com/openai/v1",
             "openai/gpt-oss-120b",
             tools,
             api_key="secret",
-        ).extract_memories("Prefiro respostas curtas", [])
+        ).extract_memories(
+            "Mano, prefiro respostas curtas",
+            [],
+            recent_user_messages=["Mano, explica isso", "Mano, resume aí"],
+        )
 
     assert memories == {
         "upserts": [
@@ -70,3 +75,13 @@ def test_memory_extraction_accepts_structured_updates():
         ],
         "forget_keys": [],
     }
+    extraction_input = json.loads(
+        post.call_args.kwargs["json"]["messages"][1]["content"]
+    )
+    assert extraction_input["recent_user_messages"] == [
+        "Mano, explica isso",
+        "Mano, resume aí",
+    ]
+    assert "mascote" in SYSTEM_PROMPT.casefold()
+    assert "primeira mensagem" in SYSTEM_PROMPT.casefold()
+    assert "recursos administrativos" in SYSTEM_PROMPT.casefold()

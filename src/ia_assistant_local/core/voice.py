@@ -12,12 +12,13 @@ import wave
 from collections.abc import Iterator
 from pathlib import Path
 
-from .config import PROJECT_ROOT
+from .config import APP_DATA_ROOT
 
-VOICE_NAME = "pm_alex"
+VOICE_NAME = "oraculo"
 VOICE_LANGUAGE = "pt-br"
-VOICE_SPEED = 1.0
-MODEL_DIRECTORY = PROJECT_ROOT / "data" / "kokoro"
+VOICE_SPEED = 0.94
+VOICE_COMPONENTS = (("pm_santa", 0.72), ("bm_george", 0.28))
+MODEL_DIRECTORY = APP_DATA_ROOT / "data" / "kokoro"
 MODEL_PATH = MODEL_DIRECTORY / "kokoro-v1.0.int8.onnx"
 FALLBACK_MODEL_PATH = MODEL_DIRECTORY / "kokoro-v1.0.onnx"
 VOICES_PATH = MODEL_DIRECTORY / "voices-v1.0.bin"
@@ -32,6 +33,7 @@ MAX_TEXT_LENGTH = 2_000
 STREAM_CHUNK_LENGTH = 80
 
 _engine = None
+_voice_style = None
 _engine_lock = threading.Lock()
 
 
@@ -65,6 +67,7 @@ def voice_status() -> dict[str, object]:
     return {
         "engine": "kokoro-onnx",
         "voice": VOICE_NAME,
+        "voice_components": [name for name, _ in VOICE_COMPONENTS],
         "language": VOICE_LANGUAGE,
         "ready": ready,
         "dependency": dependency,
@@ -89,7 +92,7 @@ def _load_engine():
         )
     if not status["model"] or not status["voices"]:
         raise RuntimeError(
-            "Os arquivos da voz pm_alex ainda não foram baixados. "
+            "Os arquivos da voz do Oráculo ainda não foram baixados. "
             "Execute python -m ia_assistant_local.core.voice --install."
         )
     with _engine_lock:
@@ -99,6 +102,16 @@ def _load_engine():
             selected_model, _ = _selected_model_path()
             _engine = Kokoro(str(selected_model), str(VOICES_PATH))
     return _engine
+
+
+def _oraculo_voice_style(engine):
+    global _voice_style
+    if _voice_style is None:
+        primary_name, primary_weight = VOICE_COMPONENTS[0]
+        _voice_style = engine.get_voice_style(primary_name) * primary_weight
+        for name, weight in VOICE_COMPONENTS[1:]:
+            _voice_style = _voice_style + engine.get_voice_style(name) * weight
+    return _voice_style
 
 
 def _clean_text(text: str) -> str:
@@ -114,9 +127,11 @@ def _wav_for(engine, text: str) -> bytes:
     with _engine_lock:
         samples, sample_rate = engine.create(
             text,
-            VOICE_NAME,
+            _oraculo_voice_style(engine),
             speed=VOICE_SPEED,
             lang=VOICE_LANGUAGE,
+            sentence_pause=0.32,
+            clause_pause=0.12,
         )
 
     import numpy as np
@@ -197,7 +212,7 @@ def _download(url: str, destination: Path, minimum_size: int) -> bool:
 def install_voice_assets() -> None:
     _download(MODEL_URL, MODEL_PATH, 50_000_000)
     _download(VOICES_URL, VOICES_PATH, 5_000_000)
-    print("[voz] Kokoro INT8 com pm_alex está pronto para uso local.")
+    print("[voz] A voz profissional do Oráculo está pronta para uso local.")
 
 
 def main() -> int:
@@ -212,7 +227,7 @@ def main() -> int:
             status = voice_status()
             print(
                 f"Kokoro={status['dependency']} modelo={status['model']} "
-                f"vozes={status['voices']} pm_alex={status['ready']}"
+                f"vozes={status['voices']} oraculo={status['ready']}"
             )
         return 0
     except (OSError, RuntimeError) as exc:

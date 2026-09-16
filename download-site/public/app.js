@@ -1,0 +1,3 @@
+const HASH="338c6baff85f3aeaa783b0ab92361d184640bde326516091d5f9810d963fe94b",button=document.querySelector("#copy-hash"),status=document.querySelector("#copy-status");
+button.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(HASH);status.textContent="SHA-256 copiado."}catch{status.textContent=HASH;status.style.overflowWrap="anywhere"}});
+if("IntersectionObserver"in window&&!matchMedia("(prefers-reduced-motion: reduce)").matches){const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add("visible");observer.unobserve(entry.target)}}),{threshold:.08});document.querySelectorAll(".reveal").forEach(el=>observer.observe(el));document.documentElement.classList.add("motion-ready")}

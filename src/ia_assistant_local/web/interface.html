@@ -1278,7 +1278,7 @@
       <section class="admin-view" id="admin-view-tests" hidden>
         <header class="admin-section-head"><div><small>LABORATÓRIO LOCAL</small><h3>Testes do Oráculo</h3><p>Valide recursos no seu navegador sem afetar conversas ou dados da equipe.</p></div></header>
         <div class="admin-test-status-grid">
-          <article><small>SAÍDA DE VOZ</small><strong id="voiceSynthesisState">Verificando…</strong><span>Kokoro local · pm_alex</span></article>
+          <article><small>SAÍDA DE VOZ</small><strong id="voiceSynthesisState">Verificando…</strong><span>Kokoro local · voz Oráculo</span></article>
           <article><small>MICROFONE</small><strong id="voiceRecognitionState">Verificando…</strong><span>Reconhecimento em português</span></article>
           <article><small>CONTEXTO</small><strong id="voiceSecurityState">Verificando…</strong><span>Permissão segura do navegador</span></article>
         </div>
@@ -2049,7 +2049,7 @@
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "chat-delete";
-      remove.textContent = "卐";
+      remove.textContent = "x";
       remove.title = "Excluir conversa";
       remove.addEventListener("click", async ()=>{
         if(!window.confirm("Excluir esta conversa permanentemente?")) return;
@@ -2918,7 +2918,7 @@
   async function refreshVoiceTests(){
     const voice=window.OraculoVoice;
     const info=await voice?.status?.();
-    document.getElementById("voiceSynthesisState").textContent=info?.ready?"pm_alex pronta":(voice?.capabilities.synthesis?"Reserva do navegador":"Indisponível");
+    document.getElementById("voiceSynthesisState").textContent=info?.ready?"Oráculo pronta":(voice?.capabilities.synthesis?"Reserva do navegador":"Indisponível");
     document.getElementById("voiceRecognitionState").textContent=voice?.capabilities.recognition?"Disponível":"Indisponível";
     document.getElementById("voiceSecurityState").textContent=voice?.capabilities.secure?"Protegido":"Requer HTTPS";
   }
@@ -2939,7 +2939,7 @@
   window.addEventListener("oraculo:voice-preview-status",event=>{
     const status=document.getElementById("voiceTestStatus");
     if(event.detail?.state==="loading") status.textContent="Gerando voz local…";
-    if(event.detail?.state==="done") status.textContent=event.detail.engine==="pm_alex"?"Teste concluído com Kokoro pm_alex.":"Teste concluído com a voz reserva do navegador.";
+    if(event.detail?.state==="done") status.textContent=event.detail.engine==="oraculo"?"Teste concluído com a voz profissional do Oráculo.":"Teste concluído com a voz reserva do navegador.";
     if(event.detail?.state==="error") status.textContent="Não foi possível reproduzir a voz.";
   });
   document.querySelectorAll("[data-admin-shortcut]").forEach(button=>{

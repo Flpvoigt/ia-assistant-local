@@ -25,6 +25,7 @@ def test_three_admins_are_created_with_isolated_memory(tmp_path):
     store.add_memory(will["id"], "Prefiro respostas curtas")
 
     _, gustavo = store.login("gustavo", credentials["gustavo"])
+    assert gustavo["admin_access"] is True
     assert store.list_chats(gustavo["id"]) == []
     assert store.list_memories(gustavo["id"]) == []
     assert store.chat_messages(will["id"], chat_id)[0]["content"] == "Minha mensagem"
@@ -57,18 +58,21 @@ def test_authorized_admins_have_permanent_full_access_and_control_permissions(tm
     _, felipe = store.login("felipe", credentials["felipe"])
 
     assert all(store.permissions_for_user(will["id"]).values())
+    assert all(store.permissions_for_user(gustavo["id"]).values())
     assert all(store.permissions_for_user(felipe["id"]).values())
     updated = {key: False for key in PERMISSION_LABELS}
     updated["system_info"] = True
-    assert store.update_user_permissions(will["id"], gustavo["id"], updated) == updated
-    assert store.has_permission(gustavo["id"], "system_info")
-    assert not store.has_permission(gustavo["id"], "memory_access")
+
+    with pytest.raises(PermissionError, match="reduzidas"):
+        store.update_user_permissions(will["id"], gustavo["id"], updated)
 
     with pytest.raises(PermissionError, match="não podem ser reduzidas"):
         store.update_user_permissions(felipe["id"], felipe["id"], updated)
 
     with pytest.raises(PermissionError, match="não podem ser reduzidas"):
         store.update_user_permissions(will["id"], will["id"], updated)
+
+    assert store.permission_users(felipe["id"]) == []
 
 
 def test_structured_memory_updates_without_duplicates(tmp_path):

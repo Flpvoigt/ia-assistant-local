@@ -158,7 +158,7 @@
     if(action==="mascot"){window.OraculoMascot.toggle();closeMenu(true);}
     if(action==="invite")invite();
     if(action==="settings")settings();
-    if(action==="admin" && account?.admin_access && account.username!=="will")openPanel("admin");
+    if(action==="admin" && account?.admin_access && account.username==="felipe")openPanel("admin");
     if(action==="logout"){
       closeMenu();
       try{await post("/api/logout",{});window.dispatchEvent(new CustomEvent("oraculo:account",{detail:{user:null,permissions:{}}}));location.reload();}
@@ -189,7 +189,7 @@
     account=event.detail.user;permissions=event.detail.permissions||{};
     if(account)loadLayout();else{layout={...defaults};applyLayout();}
     syncAccountPosition();
-    menu.querySelector('[data-profile="admin"]').hidden=!(account?.admin_access && account.username!=="will");
+    menu.querySelector('[data-profile="admin"]').hidden=!(account?.admin_access && account.username==="felipe");
     closeMenu();
     if(dialog.open)dialog.close();
     menu.querySelector("#profileName").textContent=account?.display_name||"";

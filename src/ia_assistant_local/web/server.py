@@ -42,6 +42,7 @@ EXPLICIT_MEMORY = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 INTERNAL_DETAIL_TERMS = (
+    "admin",
     "api",
     "arquitetura",
     "arquivo",
@@ -74,6 +75,49 @@ CONFIDENTIALITY_REPLY = (
     "A implementação do projeto é confidencial. Posso ajudar você a usar as "
     "funções disponíveis."
 )
+STYLE_ADAPTATION_DISABLED = (
+    "Adaptação de linguagem desativada por solicitação do usuário. Responda em "
+    "português natural e neutro, sem imitar gírias, bordões ou maneirismos."
+)
+STYLE_ADAPTATION_ENABLED = (
+    "Adaptação de linguagem ativada por solicitação do usuário. Use o perfil de "
+    "comunicação de forma natural, confortável e sem caricatura."
+)
+STYLE_DISABLE_RE = re.compile(
+    r"\b(?:pare|para|nao quero|nao deve|nao|evite|desative)\b.{0,55}"
+    r"\b(?:adapt(?:ar|e|acao)|imit(?:ar|e|acao)|girias?|bordoes?|maneirismos?|"
+    r"falar (?:como|igual a?) eu)\b"
+)
+STYLE_ENABLE_RE = re.compile(
+    r"\b(?:pode|volte|retome|ative|quero que)\b.{0,55}"
+    r"\b(?:adapt(?:ar|e|acao)|imit(?:ar|e|acao)|girias?|bordoes?|maneirismos?|"
+    r"falar (?:como|igual a?) eu)\b"
+)
+PUBLIC_CAPABILITY_RE = re.compile(
+    r"\b(?:mascote|voz|memorias?|projetos?|anexos?|cofre|tarefas?|extensoes?|"
+    r"funcoes?|recursos?|o que voce faz|o que o oraculo faz)\b"
+)
+HIGH_RISK_INTERNAL_TERMS = (
+    "admin",
+    "api",
+    "arquitetura",
+    "backend",
+    "banco de dados",
+    "codigo",
+    "css",
+    "endpoint",
+    "env",
+    "frontend",
+    "html",
+    "implementacao",
+    "instrucao interna",
+    "javascript",
+    "modelo",
+    "prompt",
+    "python",
+    "rota",
+    "servidor",
+)
 TOOL_PERMISSIONS = {
     "system_info": "system_info",
     "open_application": "open_application",
@@ -86,8 +130,22 @@ TOOL_PERMISSIONS = {
 def is_internal_details_request(message: str) -> bool:
     normalized = unicodedata.normalize("NFKD", message.casefold())
     normalized = "".join(char for char in normalized if not unicodedata.combining(char))
+    if PUBLIC_CAPABILITY_RE.search(normalized) and not any(
+        term in normalized for term in HIGH_RISK_INTERNAL_TERMS
+    ):
+        return False
     has_internal_term = any(term in normalized for term in INTERNAL_DETAIL_TERMS)
     return has_internal_term and bool(INTERNAL_SUBJECT_RE.search(normalized))
+
+
+def style_adaptation_request(message: str) -> str | None:
+    normalized = unicodedata.normalize("NFKD", message.casefold())
+    normalized = "".join(char for char in normalized if not unicodedata.combining(char))
+    if STYLE_DISABLE_RE.search(normalized):
+        return "disabled"
+    if STYLE_ENABLE_RE.search(normalized):
+        return "enabled"
+    return None
 
 
 class AssistantServer(ThreadingHTTPServer):
@@ -167,7 +225,8 @@ class AssistantHandler(BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self._security_headers()
         self.end_headers()
-        model_variant = voice_status().get("model_variant") or "int8"
+        voice_info = voice_status()
+        model_variant = voice_info.get("model_variant") or "int8"
         try:
             for index, audio in enumerate(chunks):
                 line = (
@@ -176,7 +235,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
                             "index": index,
                             "audio": base64.b64encode(audio).decode("ascii"),
                             "mime_type": "audio/wav",
-                            "voice": "pm_alex",
+                            "voice": voice_info["voice"],
                             "model": model_variant,
                         },
                         ensure_ascii=False,
@@ -558,7 +617,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
                         "audio": base64.b64encode(audio).decode("ascii"),
                         "mime_type": "audio/wav",
                         "engine": "kokoro-onnx",
-                        "voice": "pm_alex",
+                        "voice": voice_status()["voice"],
                     },
                 )
                 return
@@ -991,6 +1050,17 @@ class AssistantHandler(BaseHTTPRequestHandler):
         permissions = self.server.memory.permissions_for_user(user["id"])
         memory_enabled = permissions["memory_access"] and mode == "private"
         memory_rows = self.server.memory.list_memories(user["id"]) if memory_enabled else []
+        style_request = style_adaptation_request(message) if memory_enabled else None
+        if style_request:
+            content = (
+                STYLE_ADAPTATION_DISABLED
+                if style_request == "disabled"
+                else STYLE_ADAPTATION_ENABLED
+            )
+            self.server.memory.upsert_memory(
+                user["id"], "preference", "style_adaptation", content
+            )
+            memory_rows = self.server.memory.list_memories(user["id"])
         approved_context: list[str] = []
         raw_context = payload.get("approved_context", [])
         if payload.get("context_consent") is True and isinstance(raw_context, list):
@@ -1058,9 +1128,15 @@ class AssistantHandler(BaseHTTPRequestHandler):
             self.server.memory.add_message(user["id"], chat_id, "assistant", reply)
         existing = memory_rows
         if not blocked_internal_request and memory_enabled:
+            recent_user_messages = [
+                str(item["content"])
+                for item in history
+                if item.get("role") == "user" and isinstance(item.get("content"), str)
+            ][-11:]
+            recent_user_messages.append(message)
             threading.Thread(
                 target=self._learn_from_message,
-                args=(user["id"], message, existing),
+                args=(user["id"], message, existing, recent_user_messages),
                 daemon=True,
             ).start()
         if mode == "temporary":
@@ -1125,9 +1201,22 @@ class AssistantHandler(BaseHTTPRequestHandler):
             suffix = "Equilibrado"
         return f"Oráculo {version} · {suffix}"
 
-    def _learn_from_message(self, user_id: int, message: str, existing: list[dict]) -> None:
+    def _learn_from_message(
+        self,
+        user_id: int,
+        message: str,
+        existing: list[dict],
+        recent_user_messages: list[str],
+    ) -> None:
         try:
-            changes = self.server.agent.extract_memories(message, existing)
+            extraction_kwargs = {}
+            if "recent_user_messages" in inspect.signature(
+                self.server.agent.extract_memories
+            ).parameters:
+                extraction_kwargs["recent_user_messages"] = recent_user_messages
+            changes = self.server.agent.extract_memories(
+                message, existing, **extraction_kwargs
+            )
             for memory_key in changes["forget_keys"]:
                 self.server.memory.delete_memory_by_key(user_id, memory_key)
             for memory in changes["upserts"]:
@@ -1135,7 +1224,14 @@ class AssistantHandler(BaseHTTPRequestHandler):
                     user_id, memory["category"], memory["key"]
                 )
                 clean = self.server.memory._clean_memory_content(memory["content"])
-                if current and current["content"].casefold() != clean.casefold():
+                if memory["key"] in {
+                    "preference.communication_style",
+                    "preference.style_adaptation",
+                }:
+                    self.server.memory.upsert_memory(
+                        user_id, memory["category"], memory["key"], clean
+                    )
+                elif current and current["content"].casefold() != clean.casefold():
                     self.server.memory.create_memory_conflict(
                         user_id, memory["category"], memory["key"], current["content"], clean
                     )
@@ -1187,7 +1283,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
         print(f"[web] {self.address_string()} - {format % args}")
 
 
-def run_server() -> None:
+def create_server() -> tuple[AssistantServer, list[tuple[str, str]]]:
     settings = Settings.from_env()
     memory = MemoryStore(settings.database_path)
     created_admins = memory.bootstrap_admins()
@@ -1202,9 +1298,13 @@ def run_server() -> None:
         ToolRegistry(home),
         api_key=settings.groq_api_key,
     )
-    server = AssistantServer((HOST, PORT), agent, settings, memory)
+    return AssistantServer((HOST, PORT), agent, settings, memory), created_admins
+
+
+def run_server(open_browser: bool = True) -> None:
+    server, created_admins = create_server()
     url = f"http://{HOST}:{PORT}"
-    print(f"IA Assistant | Groq: {settings.groq_model}")
+    print(f"IA Assistant | Groq: {server.settings.groq_model}")
     if created_admins:
         print("\nCONTAS ADMINISTRATIVAS CRIADAS")
         print("Anote as senhas temporárias; elas não serão exibidas novamente.")
@@ -1214,10 +1314,11 @@ def run_server() -> None:
     print(f"Interface: {url}")
     if voice_status()["ready"]:
         variant = voice_status().get("model_variant", "local")
-        print(f"Voz local: Kokoro {variant} pm_alex (preparando em segundo plano)")
+        print(f"Voz local: Kokoro {variant} Oráculo (preparando em segundo plano)")
         threading.Thread(target=warm_voice, daemon=True, name="oraculo-voice-warmup").start()
     print("Pressione Ctrl+C para encerrar.")
-    threading.Timer(0.5, lambda: webbrowser.open(url)).start()
+    if open_browser:
+        threading.Timer(0.5, lambda: webbrowser.open(url)).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:

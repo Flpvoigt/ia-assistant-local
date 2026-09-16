@@ -49,6 +49,14 @@ O servidor abre automaticamente `http://127.0.0.1:8765` no navegador.
 Cada colaborador deve usar sua propria chave no arquivo `.env`; esse arquivo nao
 deve ser enviado ao Git. Para encerrar, pressione `Ctrl+C` no terminal.
 
+## Aplicativo instalável para Windows
+
+O Oráculo também pode ser distribuído como aplicativo de desktop. Quem instalar não precisa ter Python, Codex ou acesso ao código-fonte. Na primeira abertura, cada pessoa deve informar a própria chave da Groq; nenhuma chave pessoal é incluída no instalador.
+
+Para gerar o aplicativo e o instalador, execute `.\build-windows.ps1`. O arquivo final será criado em `dist\installer\Oraculo-Setup.exe`. As configurações, o banco local e os modelos de voz ficam em `%LOCALAPPDATA%\Oraculo`.
+
+Para gerar somente a pasta executável, use `.\build-windows.ps1 -SkipInstaller`.
+
 Instalacao manual, caso scripts PowerShell estejam bloqueados:
 
 ```powershell
@@ -116,9 +124,9 @@ O painel Extensoes mostra as integracoes implementadas: nucleo local e Home Assi
 O Home Assistant permite consultar estados e controlar luzes e tomadas autorizadas;
 aparece como "configuracao necessaria" enquanto faltar sua configuracao.
 
-Felipe e Will possuem acesso ao painel Atualizacao segura. No perfil do Will, a
-entrada administrativa permanece oculta e o painel e aberto somente pelo comando
-`/adm`. A verificacao remota e manual; o sistema recusa atualizacoes quando existem
+Felipe, Will e Gustavo possuem acesso ao painel Atualizacao segura. Nos perfis de
+Will e Gustavo, a entrada administrativa permanece oculta e o painel e aberto
+somente pelo comando `/adm`. A verificacao remota e manual; o sistema recusa atualizacoes quando existem
 mudancas locais e cria uma aprovacao separada antes de executar `git pull --ff-only`,
 com backup consistente do banco. Depois de aplicar uma versao nova, reinicie o
 Oraculo quando o painel solicitar.
@@ -132,22 +140,31 @@ duradouras que possam ajudar no futuro. Pedidos momentaneos e informacoes sensiv
 como senhas, tokens, documentos e dados financeiros, nao devem virar memoria.
 Memorias automaticas podem ser revisadas e excluidas nas configuracoes.
 
+O Oraculo tambem adapta o jeito de conversar a cada conta. Desde a primeira
+mensagem, ele pode aprender formalidade, ritmo, objetividade, humor, girias e
+bordoes, salvando apenas um resumo do estilo e refinando-o ao longo da conversa.
+A adaptacao deve ser natural, sem caricatura e sem copiar erros ou linguagem
+ofensiva. O usuario pode dizer "pare de imitar meu jeito" para desativar a funcao
+de forma persistente e "pode voltar a adaptar seu jeito" para reativa-la.
+
+Ao responder perguntas sobre si mesmo, o Oraculo pode explicar suas funcoes
+publicas, incluindo voz, mascote, memorias, projetos, anexos, tarefas, cofre,
+extensoes e configuracoes. Ele explica como usar os recursos, mas nao revela
+codigo, arquitetura, detalhes internos nem recursos administrativos.
+
 As memorias sao organizadas como informacoes pessoais, preferencias, projetos e
 objetivos. Cada fato recebe uma chave estavel: quando o usuario corrige uma
 informacao, a versao anterior e atualizada em vez de gerar uma duplicata. Pedidos
 explicitos para esquecer um fato removem a memoria correspondente.
 
-Felipe, com papel `owner`, exibe o painel administrativo no perfil. Will conserva o
-papel `admin`, nao ve essa entrada no perfil e abre o mesmo painel somente com
-`/adm`. Os dois acessos sao validados pelo backend e podem auditar as conversas dos
+Felipe, com papel `owner`, exibe o painel administrativo no perfil. Will e Gustavo
+conservam o papel `admin`, nao veem essa entrada no perfil e abrem o mesmo painel
+somente com `/adm`. Os tres acessos sao validados pelo backend e podem auditar as conversas dos
 demais usuarios durante validacoes e diagnosticos. Os membros da equipe devem estar
 cientes dessa auditoria.
 
-No mesmo painel, Felipe e Will podem liberar ou bloquear para Gustavo o acesso a
-memorias, ao painel de contexto, a informacoes do computador, a abertura de
-aplicativos e as funcoes do Home Assistant. As escolhas ficam salvas no banco local
-e sao validadas pelo servidor antes de cada uso. Felipe e Will sempre conservam
-acesso total e suas permissoes nao podem ser reduzidas pelo painel ou pela API.
+Felipe, Will e Gustavo sempre conservam acesso total, e suas permissoes nao podem
+ser reduzidas pelo painel ou pela API.
 
 O `.env` nunca deve ser enviado ao Git. Sem os dados do Home Assistant, as
 ferramentas da casa permanecem indisponiveis.
@@ -184,10 +201,13 @@ adicionar ferramentas.
 
 ## Voz profissional local
 
-O Oráculo usa o Kokoro ONNX com a voz masculina `pm_alex` para responder em
-português brasileiro. A síntese roda no próprio computador, sem chave de API e
-sem cobrança por fala. Se o mecanismo ou o modelo estiver indisponível, a
-interface troca automaticamente para a voz instalada no navegador.
+O Oráculo usa o Kokoro ONNX com uma voz masculina própria para responder em
+português brasileiro. O perfil combina uma base brasileira grave com uma camada
+britânica discreta e usa cadência mais calma, buscando o estilo de um assistente
+cinematográfico sem imitar a voz de uma pessoa real. A síntese roda no próprio
+computador, sem chave de API e sem cobrança por fala. Se o mecanismo ou o modelo
+estiver indisponível, a interface troca automaticamente para a voz instalada no
+navegador.
 
 `install.ps1` no Windows e `bash install.sh` no macOS/Linux instalam a biblioteca
 e baixam uma vez os arquivos do modelo para `data/kokoro/`. O modelo INT8 ocupa

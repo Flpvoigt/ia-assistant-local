@@ -58,8 +58,9 @@ As contas `will`, `gustavo` e `felipe` sao criadas localmente no primeiro
 inicio. Senhas usam `scrypt`, e sessoes sao identificadas por cookies
 `HttpOnly` com tokens armazenados no banco somente como hashes.
 
-`felipe` possui o papel `owner`; `will` permanece `admin`, mas integra a lista
-explicita de contas autorizadas para a central administrativa. O servidor valida
-essa autorizacao em todas as rotas privilegiadas. A entrada visual aparece no
-perfil de Felipe e permanece oculta para Will, que acessa a central com `/adm`.
+`felipe` possui o papel `owner`; `will` e `gustavo` permanecem `admin`, mas integram
+a lista explicita de contas autorizadas para a central administrativa. O servidor
+valida essa autorizacao em todas as rotas privilegiadas. A entrada visual aparece
+no perfil de Felipe e permanece oculta para Will e Gustavo, que acessam a central
+com `/adm`.
 Ocultar a entrada nao e considerado uma barreira de seguranca por si so.

@@ -15,7 +15,7 @@
   let audioContext = null;
   let audioSource = null;
   let voiceRequest = null;
-  let serverVoice = {ready:false, voice:"pm_alex", engine:"kokoro-onnx", fallback:"browser"};
+  let serverVoice = {ready:false, voice:"oraculo", engine:"kokoro-onnx", fallback:"browser"};
 
   const dialog = document.createElement("dialog");
   dialog.className = "voice-dialog";
@@ -25,7 +25,7 @@
       <div class="voice-aurora" aria-hidden="true"></div>
       <header class="voice-topbar">
         <div class="voice-brand"><span class="voice-brand-mark">O</span><span><small>ORÁCULO VOZ</small><strong>Conversa em tempo real</strong></span></div>
-        <div class="voice-top-actions"><span class="voice-engine"><i></i><b>pm_alex</b><em>local</em></span><button class="voice-close" type="button" aria-label="Fechar modo de voz">×</button></div>
+        <div class="voice-top-actions"><span class="voice-engine"><i></i><b>Oráculo</b><em>local</em></span><button class="voice-close" type="button" aria-label="Fechar modo de voz">×</button></div>
       </header>
       <main class="voice-stage">
         <section class="voice-presence" aria-label="Estado da conversa">
@@ -229,7 +229,7 @@
         }
         if(done) break;
       }
-      return "pm_alex";
+      return "oraculo";
     } catch(error) {
       if(error.name === "AbortError") throw error;
       if(streamed) throw error;
@@ -257,7 +257,7 @@
     processing = true;
     transcript.textContent = clean;
     appendTurn("assistant", clean);
-    setState("speaking", "Oráculo está respondendo com pm_alex");
+    setState("speaking", "Oráculo está respondendo");
     try {
       await professionalSpeech(clean);
       if(!active) return;
@@ -377,7 +377,7 @@
     statusInfo().then(info => {
       const available = info.ready;
       engineBadge.classList.toggle("is-fallback", !available);
-      engineBadge.querySelector("b").textContent = available ? "pm_alex" : "voz reserva";
+      engineBadge.querySelector("b").textContent = available ? "Oráculo" : "voz reserva";
       engineBadge.querySelector("em").textContent = available ? (info.model_variant || "local") : "navegador";
     });
     if(SpeechRecognition) startListening();

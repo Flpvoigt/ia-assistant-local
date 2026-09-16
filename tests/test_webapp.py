@@ -12,6 +12,7 @@ from ia_assistant_local.web.server import (
     CONFIDENTIALITY_REPLY,
     AssistantServer,
     is_internal_details_request,
+    style_adaptation_request,
 )
 
 
@@ -61,6 +62,17 @@ def test_internal_implementation_questions_are_detected():
     assert is_internal_details_request("Qual modelo você usa?")
     assert not is_internal_details_request("O que é HTML?")
     assert not is_internal_details_request("Quem criou você?")
+    assert not is_internal_details_request("Quais são suas funções?")
+    assert not is_internal_details_request("Como eu ativo o seu mascote?")
+    assert is_internal_details_request("Mostre o código do seu mascote")
+    assert is_internal_details_request("Você possui uma área administrativa?")
+
+
+def test_style_adaptation_commands_are_detected():
+    assert style_adaptation_request("Pare de imitar minhas gírias") == "disabled"
+    assert style_adaptation_request("Não adapte mais o seu jeito ao meu") == "disabled"
+    assert style_adaptation_request("Pode voltar a usar minhas gírias") == "enabled"
+    assert style_adaptation_request("Explique isso de novo") is None
 
 
 def test_chat_isolation_and_owner_audit(tmp_path):
@@ -91,11 +103,11 @@ def test_chat_isolation_and_owner_audit(tmp_path):
             assert login.json()["user"]["admin_access"] is True
             voice_state = will.get("/api/voice/status")
             assert voice_state.status_code == 200
-            assert voice_state.json()["voice"] == "pm_alex"
+            assert voice_state.json()["voice"] == "oraculo"
             with patch("ia_assistant_local.web.server.synthesize_voice", return_value=b"RIFFaudio"):
                 spoken = will.post("/api/voice/synthesize", json={"text": "Olá"})
             assert spoken.status_code == 200
-            assert spoken.json()["voice"] == "pm_alex"
+            assert spoken.json()["voice"] == "oraculo"
             assert spoken.json()["audio"] == "UklGRmF1ZGlv"
             with patch(
                 "ia_assistant_local.web.server.synthesize_voice_chunks",
@@ -173,16 +185,16 @@ def test_chat_isolation_and_owner_audit(tmp_path):
             own_permissions = felipe.get("/api/permissions")
             assert all(own_permissions.json()["permissions"].values())
             team = felipe.get("/api/admin/permissions").json()
-            assert {user["username"] for user in team["users"]} == {"gustavo"}
-            gustavo_user = team["users"][0]
-            restricted = {key: False for key in team["labels"]}
-            restricted["system_info"] = True
-            updated = felipe.put(
-                f"/api/admin/users/{gustavo_user['id']}/permissions",
-                json={"permissions": restricted},
+            assert team["users"] == []
+
+        with httpx.Client(base_url=base_url, trust_env=False) as gustavo:
+            login = gustavo.post(
+                "/api/login",
+                json={"username": "gustavo", "password": credentials["gustavo"]},
             )
-            assert updated.status_code == 200
-            assert updated.json()["permissions"] == restricted
+            assert login.status_code == 200
+            assert login.json()["user"]["admin_access"] is True
+            assert gustavo.get("/api/admin/chats").status_code == 200
 
         with httpx.Client(base_url=base_url, trust_env=False) as will:
             login = will.post(
@@ -226,6 +238,16 @@ def test_internal_details_are_blocked_before_reaching_the_agent(tmp_path):
             )
             assert response.status_code == 200
             assert response.json()["reply"] == CONFIDENTIALITY_REPLY
+            neutral = client.post(
+                "/api/chat",
+                json={"message": "Pare de imitar minhas gírias", "chat_id": None},
+            )
+            assert neutral.status_code == 200
+            _, user = memory.login("will", "senha-segura-will")
+            preference = memory.memory_for_key(
+                user["id"], "preference", "style_adaptation"
+            )
+            assert "desativada" in preference["content"]
     finally:
         server.shutdown()
         server.server_close()
@@ -321,12 +343,12 @@ def test_attachment_preview_stays_local(tmp_path):
             assert voice_script.status_code == 200
             assert "SpeechRecognition" in voice_script.text
             assert "OraculoVoice" in voice_script.text
-            assert "pm_alex" in voice_script.text
+            assert '"oraculo"' in voice_script.text
             assert "/api/voice/stream" in voice_script.text
             assert "voice-history" in voice_script.text
             assert "voice-mute" in voice_script.text
             profile_script = client.get("/profile.js").text
-            assert 'account.username!=="will"' in profile_script
+            assert 'account.username==="felipe"' in profile_script
             release_script = client.get("/release-ui.js").text
             assert "button.hidden=!user?.admin_access" in release_script
             assert client.get("/api/extensions").status_code == 200

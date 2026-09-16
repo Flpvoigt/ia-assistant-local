@@ -1,14 +1,28 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+SOURCE_ROOT = Path(__file__).resolve().parents[3]
+IS_FROZEN = bool(getattr(sys, "frozen", False))
+BUNDLE_ROOT = Path(getattr(sys, "_MEIPASS", SOURCE_ROOT))
+PROJECT_ROOT = BUNDLE_ROOT if IS_FROZEN else SOURCE_ROOT
+if IS_FROZEN:
+    local_app_data = Path(
+        os.getenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))
+    )
+    APP_DATA_ROOT = Path(
+        os.getenv("ORACULO_DATA_HOME", str(local_app_data / "Oraculo"))
+    )
+else:
+    APP_DATA_ROOT = Path(os.getenv("ORACULO_DATA_HOME", str(PROJECT_ROOT)))
+ENV_PATH = APP_DATA_ROOT / ".env"
 
 
 def _load_dotenv(path: Path | None = None) -> None:
-    path = path or PROJECT_ROOT / ".env"
+    path = path or ENV_PATH
     if not path.exists():
         return
     for raw_line in path.read_text(encoding="utf-8").splitlines():
@@ -35,10 +49,10 @@ class Settings:
         _load_dotenv()
         entities = os.getenv("HOME_ASSISTANT_ALLOWED_ENTITIES", "")
         database_path = Path(
-            os.getenv("ORACULO_DATABASE_PATH", str(PROJECT_ROOT / "data" / "oraculo.db"))
+            os.getenv("ORACULO_DATABASE_PATH", str(APP_DATA_ROOT / "data" / "oraculo.db"))
         )
         if not database_path.is_absolute():
-            database_path = PROJECT_ROOT / database_path
+            database_path = APP_DATA_ROOT / database_path
         primary_model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
         configured_models = [
             item.strip()

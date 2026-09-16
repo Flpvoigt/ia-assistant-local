@@ -15,7 +15,7 @@ ADMIN_ACCOUNTS = {
     "gustavo": ("Gustavo", "admin"),
     "felipe": ("Felipe", "owner"),
 }
-ADMIN_CONSOLE_ACCOUNTS = frozenset({"felipe", "will"})
+ADMIN_CONSOLE_ACCOUNTS = frozenset({"felipe", "will", "gustavo"})
 USERNAME_RE = re.compile(r"^[a-z0-9_-]{3,32}$")
 SESSION_SECONDS = 60 * 60 * 24 * 30
 PERMISSION_LABELS = {
@@ -1183,7 +1183,7 @@ class MemoryStore:
                 """
                 SELECT id, username, display_name, role
                 FROM users
-                WHERE username NOT IN ('felipe', 'will')
+                WHERE username NOT IN ('felipe', 'will', 'gustavo')
                 ORDER BY display_name
                 """
             ).fetchall()

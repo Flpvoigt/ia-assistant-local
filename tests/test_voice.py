@@ -6,7 +6,8 @@ from ia_assistant_local.core import voice
 def test_voice_status_describes_local_engine():
     status = voice.voice_status()
     assert status["engine"] == "kokoro-onnx"
-    assert status["voice"] == "pm_alex"
+    assert status["voice"] == "oraculo"
+    assert status["voice_components"] == ["pm_santa", "bm_george"]
     assert status["language"] == "pt-br"
     assert status["fallback"] == "browser"
     assert status["ready"] == (status["dependency"] and status["model"] and status["voices"])
