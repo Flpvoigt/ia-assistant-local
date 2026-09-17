@@ -1,0 +1,13 @@
+{
+  "version": "0.2.1",
+  "url": "https://oraculo-desktop.vercel.app/downloads/Oraculo-Setup-0.2.1.exe",
+  "sha256": "2941b84d1f77e9cacc0b51fbd47355c0caabae8928b02c43ce6e603eff7bd591",
+  "size": 82744540,
+  "notes": [
+    "Perfil local com acesso direto, sem cadastro ou senha",
+    "Área administrativa opcional com autenticação preservada",
+    "Atualizações automáticas em segundo plano",
+    "Verificação SHA-256 antes da instalação",
+    "Instalação silenciosa quando o Oráculo estiver fechado"
+  ]
+}

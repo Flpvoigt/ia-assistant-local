@@ -27,7 +27,7 @@ atalhos usados pela equipe.
 Usuario (interface web; voz no futuro)
               |
               v
-   Sessao autenticada (admin)
+   Perfil local automatico
               |
               v
  SQLite: chats + historico
@@ -54,13 +54,15 @@ O modelo interpreta linguagem natural, mas nao executa comandos diretamente.
 `ToolRegistry` e a fronteira de confianca: ferramentas desconhecidas,
 aplicativos nao listados e entidades nao autorizadas sao recusados.
 
-As contas `will`, `gustavo` e `felipe` sao criadas localmente no primeiro
-inicio. Senhas usam `scrypt`, e sessoes sao identificadas por cookies
-`HttpOnly` com tokens armazenados no banco somente como hashes.
+O aplicativo cria o perfil `oraculo` e o utiliza automaticamente para o uso
+comum. Como o servidor escuta somente em `127.0.0.1`, esse perfil representa a
+pessoa que usa a instalação local. As contas `will`, `gustavo` e `felipe`
+continuam disponíveis apenas para a área administrativa opcional. Suas senhas
+usam `scrypt`, e as sessões administrativas usam cookies `HttpOnly` com tokens
+armazenados no banco somente como hashes.
 
 `felipe` possui o papel `owner`; `will` e `gustavo` permanecem `admin`, mas integram
 a lista explicita de contas autorizadas para a central administrativa. O servidor
 valida essa autorizacao em todas as rotas privilegiadas. A entrada visual aparece
-no perfil de Felipe e permanece oculta para Will e Gustavo, que acessam a central
-com `/adm`.
+no perfil das três contas autorizadas, que também acessam a central com `/adm`.
 Ocultar a entrada nao e considerado uma barreira de seguranca por si so.

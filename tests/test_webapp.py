@@ -348,7 +348,8 @@ def test_attachment_preview_stays_local(tmp_path):
             assert "voice-history" in voice_script.text
             assert "voice-mute" in voice_script.text
             profile_script = client.get("/profile.js").text
-            assert 'account.username==="felipe"' in profile_script
+            assert 'account?.admin_access' in profile_script
+            assert 'data-profile="team"' in profile_script
             release_script = client.get("/release-ui.js").text
             assert "button.hidden=!user?.admin_access" in release_script
             assert client.get("/api/extensions").status_code == 200

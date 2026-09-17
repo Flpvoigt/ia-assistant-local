@@ -155,12 +155,16 @@ class AssistantServer(ThreadingHTTPServer):
         agent: LocalAgent,
         settings: Settings,
         memory: MemoryStore,
+        local_access: bool = False,
     ):
+        if local_access and address[0] not in {"127.0.0.1", "::1", "localhost"}:
+            raise ValueError("O perfil sem login exige um servidor somente local.")
         self.tasks = TaskManager()
         super().__init__(address, AssistantHandler)
         self.agent = agent
         self.settings = settings
         self.memory = memory
+        self.local_access = local_access
         self.started_at = time.time()
 
     def server_close(self) -> None:
@@ -170,6 +174,19 @@ class AssistantServer(ThreadingHTTPServer):
 
 class AssistantHandler(BaseHTTPRequestHandler):
     server: AssistantServer
+
+    def _allow_local_request(self) -> bool:
+        if not self.server.local_access:
+            return True
+        port = self.server.server_address[1]
+        hosts = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
+        origin = self.headers.get("Origin")
+        valid_host = self.headers.get("Host", "").lower() in hosts
+        valid_origin = not origin or origin.lower() in {f"http://{host}" for host in hosts}
+        if not valid_host or not valid_origin:
+            self._send_json(403, {"error": "Acesso permitido somente pela interface local."})
+            return False
+        return True
 
     def _security_headers(self) -> None:
         self.send_header("X-Content-Type-Options", "nosniff")
@@ -255,9 +272,15 @@ class AssistantHandler(BaseHTTPRequestHandler):
         return morsel.value if morsel else None
 
     def _require_user(self) -> dict:
-        user = self.server.memory.current_user(self._session_token())
+        user = self._current_user()
         if user is None:
             raise PermissionError("Faça login para continuar.")
+        return user
+
+    def _current_user(self) -> dict | None:
+        user = self.server.memory.current_user(self._session_token())
+        if user is None and self.server.local_access:
+            user = self.server.memory.local_user()
         return user
 
     def _require_permission(self, user: dict, permission: str) -> None:
@@ -283,6 +306,8 @@ class AssistantHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:
+        if not self._allow_local_request():
+            return
         parsed = urlparse(self.path)
         path = parsed.path
         if path == "/":
@@ -312,7 +337,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
             self._send_static(*static_files[path])
             return
         if path == "/api/status":
-            user = self.server.memory.current_user(self._session_token())
+            user = self._current_user()
             self._send_json(
                 200,
                 {
@@ -590,6 +615,8 @@ class AssistantHandler(BaseHTTPRequestHandler):
         self._send_json(404, {"error": "Rota não encontrada."})
 
     def do_POST(self) -> None:
+        if not self._allow_local_request():
+            return
         try:
             if self.path == "/api/login":
                 payload = self._read_json()
@@ -639,7 +666,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
                     str(payload.get("current_password", "")),
                     str(payload.get("new_password", "")),
                 )
-                user = self.server.memory.current_user(self._session_token())
+                user = self._current_user()
                 self._send_json(200, {"user": user})
                 return
             if self.path == "/api/memories":
@@ -874,6 +901,8 @@ class AssistantHandler(BaseHTTPRequestHandler):
             self._send_json(502, {"error": str(exc)})
 
     def do_PUT(self) -> None:
+        if not self._allow_local_request():
+            return
         try:
             conflict_match = re.fullmatch(r"/api/memory-conflicts/(\d+)", self.path)
             if conflict_match:
@@ -1243,6 +1272,8 @@ class AssistantHandler(BaseHTTPRequestHandler):
             return
 
     def do_DELETE(self) -> None:
+        if not self._allow_local_request():
+            return
         try:
             user = self._require_user()
             if self.path.startswith("/api/memories/"):
@@ -1286,6 +1317,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
 def create_server() -> tuple[AssistantServer, list[tuple[str, str]]]:
     settings = Settings.from_env()
     memory = MemoryStore(settings.database_path)
+    memory.bootstrap_local_user()
     created_admins = memory.bootstrap_admins()
     home = HomeAssistantClient(
         settings.home_assistant_url,
@@ -1298,7 +1330,9 @@ def create_server() -> tuple[AssistantServer, list[tuple[str, str]]]:
         ToolRegistry(home),
         api_key=settings.groq_api_key,
     )
-    return AssistantServer((HOST, PORT), agent, settings, memory), created_admins
+    return AssistantServer(
+        (HOST, PORT), agent, settings, memory, local_access=True
+    ), created_admins
 
 
 def run_server(open_browser: bool = True) -> None:

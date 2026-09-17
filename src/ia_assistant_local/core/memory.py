@@ -16,6 +16,7 @@ ADMIN_ACCOUNTS = {
     "felipe": ("Felipe", "owner"),
 }
 ADMIN_CONSOLE_ACCOUNTS = frozenset({"felipe", "will", "gustavo"})
+LOCAL_ACCOUNT = ("oraculo", "Usuário", "member")
 USERNAME_RE = re.compile(r"^[a-z0-9_-]{3,32}$")
 SESSION_SECONDS = 60 * 60 * 24 * 30
 PERMISSION_LABELS = {
@@ -342,6 +343,37 @@ class MemoryStore:
                 )
                 created.append((username, temporary_password))
         return created
+
+    def bootstrap_local_user(self) -> dict:
+        """Create the passwordless device profile used by the desktop app."""
+        username, display_name, role = LOCAL_ACCOUNT
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM users WHERE username = ?", (username,)
+            ).fetchone()
+            if row is None:
+                salt = secrets.token_bytes(16)
+                password_hash = self._password_hash(secrets.token_urlsafe(32), salt)
+                connection.execute(
+                    """
+                    INSERT INTO users
+                        (username, display_name, password_hash, password_salt, role,
+                         must_change_password)
+                    VALUES (?, ?, ?, ?, ?, 0)
+                    """,
+                    (username, display_name, password_hash, salt, role),
+                )
+                row = connection.execute(
+                    "SELECT * FROM users WHERE username = ?", (username,)
+                ).fetchone()
+        return self._public_user(row)
+
+    def local_user(self) -> dict | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM users WHERE username = ?", (LOCAL_ACCOUNT[0],)
+            ).fetchone()
+        return self._public_user(row) if row else None
 
     def login(self, username: str, password: str) -> tuple[str, dict]:
         normalized = username.strip().lower()

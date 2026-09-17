@@ -33,10 +33,11 @@
     mascot:icon('<rect x="5" y="6" width="14" height="15" rx="6"/><path d="M12 6V3M9 12v2m6-2v2"/>'),
     invite:icon('<path d="m3 11 18-8-7 18-3-8-8-2Zm8 2L21 3"/>'),
     settings:icon('<path d="m9 3-.6 3-2.5 1L3 6l-1 4 2.5 2L4 15l-1 2 3 3 3-1 3 1 2 1 3-3-1-3 2-2 3-1-1-4-3-.5L15 4l-2-1Z"/><circle cx="12" cy="12" r="3"/>'),
+    team:icon('<path d="M12 3a4 4 0 0 0-4 4v3H6v11h12V10h-2V7a4 4 0 0 0-4-4Zm-2 7V7a2 2 0 1 1 4 0v3"/>'),
     logout:icon('<path d="M10 4H5v16h5m4-12 4 4-4 4m-5-4h12"/>')
   };
   menu.innerHTML='<header role="none"><strong id="profileName"></strong><small id="profileRole"></small></header>'+
-    [["usage","Uso da conta",""],["mascot","Mostrar mascote","Alt+Shift+M"],["settings","Configurações","Ctrl+,"],["admin","Painel do dev-chefe",""],["logout","Sair",""]].map(([action,label,shortcut])=>
+    [["usage","Uso do perfil",""],["mascot","Mostrar mascote","Alt+Shift+M"],["settings","Configurações","Ctrl+,"],["team","Acesso da equipe",""],["admin","Painel administrativo",""],["logout","Voltar ao perfil local",""]].map(([action,label,shortcut])=>
       '<button type="button" role="menuitem" tabindex="-1" data-profile="'+action+'">'+icons[action]+'<span class="menu-label">'+label+'</span><kbd>'+shortcut+'</kbd></button>').join("");
   document.body.append(menu);
   const dialog=document.createElement("dialog");dialog.className="profile-dialog";dialog.setAttribute("aria-labelledby","profileDialogTitle");
@@ -92,10 +93,10 @@
     show("Convide um amigo",'<p id="inviteExplanation"></p><textarea id="inviteMessage" aria-label="Mensagem de convite" readonly></textarea><div class="profile-actions"><button class="btn primary" id="copyInvite">Copiar convite</button><button class="btn" id="shareInvite">Compartilhar</button></div><p class="profile-status" role="status"></p>');
     content.querySelector("#inviteExplanation").textContent=local
       ?"Esta instalação roda somente neste computador. O convite orienta seu amigo a pedir acesso ao responsável; compartilhar localhost não dá acesso remoto."
-      :"O link exige conexão com este servidor e uma conta autorizada. Compartilhar o convite não cria uma conta.";
+      :"O link exige conexão com este servidor. O acesso comum usa um perfil local sem senha.";
     const message=local
-      ?"Venha testar o Oráculo! Fale com Felipe para receber acesso e as instruções de instalação. Cada participante precisa de uma conta autorizada. Não compartilhe senhas ou chaves de API."
-      :"Venha testar o Oráculo: "+location.origin+"/\nPeça uma conta ao responsável pelo ambiente. O acesso depende da conexão com este servidor.";
+      ?"Venha testar o Oráculo! Baixe o aplicativo, informe sua própria chave da Groq e comece a conversar. Não compartilhe chaves de API."
+      :"Venha testar o Oráculo: "+location.origin+"/\nO acesso comum abre diretamente em um perfil local.";
     content.querySelector("#inviteMessage").value=message;
     const status=content.querySelector(".profile-status");
     content.querySelector("#copyInvite").onclick=async()=>{
@@ -107,7 +108,7 @@
   }
   function settings(){
     const pet=window.OraculoMascot.status();
-    show("Configurações",'<div class="settings-identity"><span class="settings-avatar">'+account.display_name.slice(0,2).toUpperCase()+'</span><div><strong>'+account.display_name+'</strong><small>@'+account.username+' · '+(account.role==="owner"?"Dev-chefe":"Administrador")+'</small></div></div><div class="settings-shell"><nav class="settings-nav" aria-label="Seções"><button type="button" data-settings="appearance" aria-pressed="true"><b>Visual</b><small>Aparência e leitura</small></button><button type="button" data-settings="experience"><b>Experiência</b><small>Mascote e apresentação</small></button><button type="button" data-settings="data"><b>Dados</b><small>Memória e privacidade</small></button><button type="button" data-settings="account"><b>Conta</b><small>Segurança de acesso</small></button></nav><div class="settings-content"><section id="settings-appearance"><header><small>INTERFACE</small><h3>Aparência e leitura</h3><p>Ajustes salvos somente para esta conta neste navegador.</p></header><label class="setting-row"><span><b>Tamanho do texto</b><small>Mensagens da conversa</small></span><select id="layoutText"><option value="14">Pequeno</option><option value="16">Padrão</option><option value="18">Grande</option><option value="20">Maior</option></select></label><label class="setting-row"><span><b>Largura da conversa</b><small>Área útil das respostas</small></span><select id="layoutWidth"><option value="760">Focada</option><option value="1000">Equilibrada</option><option value="1400">Ampla</option></select></label><label class="setting-row"><span><b>Modo compacto</b><small>Reduz o espaço entre mensagens</small></span><input id="layoutCompact" type="checkbox"></label><label class="setting-row"><span><b>Ambiente discreto</b><small>Oculta estrelas e nebulosas</small></span><input id="layoutQuiet" type="checkbox"></label><label class="setting-row"><span><b>Animações</b><small>Transições e efeito de escrita</small></span><input id="layoutEffects" type="checkbox"></label><button type="button" class="settings-reset" id="resetLayout">Restaurar padrão</button><p id="layoutStatus" class="profile-status" role="status"></p></section><section id="settings-experience" hidden><header><small>PERSONALIZAÇÃO</small><h3>Experiência do Oráculo</h3><p>Escolha os elementos interativos que deseja manter na interface.</p></header><label class="setting-row"><span><b>Mostrar mascote</b><small>Exibe o companheiro nesta conta</small></span><input type="checkbox" id="petVisible"></label><label class="setting-row"><span><b>Movimento livre</b><small>Permite caminhar e descansar pela interface</small></span><input type="checkbox" id="petRoaming"></label><button class="settings-feature" id="profileReplay"><span><b>Rever apresentação de versão</b><small>Executa novamente a abertura cinematográfica</small></span><i>›</i></button></section><section id="settings-data" hidden><header><small>CONTROLE LOCAL</small><h3>Dados e privacidade</h3><p>Gerencie o que o Oráculo guarda e processa neste computador.</p></header><div class="settings-features"><button class="settings-feature" id="profileMemories"><span><b>Memórias</b><small>Revisar fatos e contradições</small></span><i>›</i></button><button class="settings-feature" id="profileVault"><span><b>Cofre privado</b><small>Informações criptografadas fora do contexto</small></span><i>›</i></button><button class="settings-feature" id="profileTasks"><span><b>Tarefas em segundo plano</b><small>Progresso, resultados e cancelamentos</small></span><i>›</i></button><button class="settings-feature" id="profileSystem"><span><b>Estado do sistema</b><small>Groq, banco e serviços locais</small></span><i>›</i></button></div></section><section id="settings-account" hidden><header><small>SEGURANÇA</small><h3>Alterar senha</h3><p>Use uma senha exclusiva com pelo menos dez caracteres.</p></header><form id="profilePassword" class="settings-password"><label>Senha atual<input type="password" name="current" autocomplete="current-password" required></label><label>Nova senha<input type="password" name="next" autocomplete="new-password" minlength="10" required></label><label>Confirme a nova senha<input type="password" name="repeat" autocomplete="new-password" minlength="10" required></label><button class="btn primary" type="submit">Atualizar senha</button><p class="profile-status" role="status"></p></form></section></div></div>');
+    show("Configurações",'<div class="settings-identity"><span class="settings-avatar">'+account.display_name.slice(0,2).toUpperCase()+'</span><div><strong>'+account.display_name+'</strong><small>@'+account.username+' · '+(account.role==="owner"?"Dev-chefe":account.role==="admin"?"Administrador":"Perfil local")+'</small></div></div><div class="settings-shell"><nav class="settings-nav" aria-label="Seções"><button type="button" data-settings="appearance" aria-pressed="true"><b>Visual</b><small>Aparência e leitura</small></button><button type="button" data-settings="experience"><b>Experiência</b><small>Mascote e apresentação</small></button><button type="button" data-settings="data"><b>Dados</b><small>Memória e privacidade</small></button><button type="button" data-settings="account"><b>Conta</b><small>Segurança de acesso</small></button></nav><div class="settings-content"><section id="settings-appearance"><header><small>INTERFACE</small><h3>Aparência e leitura</h3><p>Ajustes salvos somente para este perfil neste navegador.</p></header><label class="setting-row"><span><b>Tamanho do texto</b><small>Mensagens da conversa</small></span><select id="layoutText"><option value="14">Pequeno</option><option value="16">Padrão</option><option value="18">Grande</option><option value="20">Maior</option></select></label><label class="setting-row"><span><b>Largura da conversa</b><small>Área útil das respostas</small></span><select id="layoutWidth"><option value="760">Focada</option><option value="1000">Equilibrada</option><option value="1400">Ampla</option></select></label><label class="setting-row"><span><b>Modo compacto</b><small>Reduz o espaço entre mensagens</small></span><input id="layoutCompact" type="checkbox"></label><label class="setting-row"><span><b>Ambiente discreto</b><small>Oculta estrelas e nebulosas</small></span><input id="layoutQuiet" type="checkbox"></label><label class="setting-row"><span><b>Animações</b><small>Transições e efeito de escrita</small></span><input id="layoutEffects" type="checkbox"></label><button type="button" class="settings-reset" id="resetLayout">Restaurar padrão</button><p id="layoutStatus" class="profile-status" role="status"></p></section><section id="settings-experience" hidden><header><small>PERSONALIZAÇÃO</small><h3>Experiência do Oráculo</h3><p>Escolha os elementos interativos que deseja manter na interface.</p></header><label class="setting-row"><span><b>Mostrar mascote</b><small>Exibe o companheiro nesta conta</small></span><input type="checkbox" id="petVisible"></label><label class="setting-row"><span><b>Movimento livre</b><small>Permite caminhar e descansar pela interface</small></span><input type="checkbox" id="petRoaming"></label><button class="settings-feature" id="profileReplay"><span><b>Rever apresentação de versão</b><small>Executa novamente a abertura cinematográfica</small></span><i>›</i></button></section><section id="settings-data" hidden><header><small>CONTROLE LOCAL</small><h3>Dados e privacidade</h3><p>Gerencie o que o Oráculo guarda e processa neste computador.</p></header><div class="settings-features"><button class="settings-feature" id="profileMemories"><span><b>Memórias</b><small>Revisar fatos e contradições</small></span><i>›</i></button><button class="settings-feature" id="profileVault"><span><b>Cofre privado</b><small>Informações criptografadas fora do contexto</small></span><i>›</i></button><button class="settings-feature" id="profileTasks"><span><b>Tarefas em segundo plano</b><small>Progresso, resultados e cancelamentos</small></span><i>›</i></button><button class="settings-feature" id="profileSystem"><span><b>Estado do sistema</b><small>Groq, banco e serviços locais</small></span><i>›</i></button></div></section><section id="settings-account" hidden><header><small>SEGURANÇA</small><h3>Alterar senha</h3><p>Use uma senha exclusiva com pelo menos dez caracteres.</p></header><form id="profilePassword" class="settings-password"><label>Senha atual<input type="password" name="current" autocomplete="current-password" required></label><label>Nova senha<input type="password" name="next" autocomplete="new-password" minlength="10" required></label><label>Confirme a nova senha<input type="password" name="repeat" autocomplete="new-password" minlength="10" required></label><button class="btn primary" type="submit">Atualizar senha</button><p class="profile-status" role="status"></p></form></section></div></div>');
     dialog.classList.add("settings-mode");
     content.querySelector("#petVisible").checked=pet.visible;
     content.querySelector("#petRoaming").checked=pet.roaming;
@@ -122,6 +123,7 @@
     content.querySelector("#settings-appearance").append(content.querySelector("#profileReplay"));
     content.querySelector("#settings-experience").remove();
     content.querySelector('[data-settings="experience"]').remove();
+    content.querySelector('[data-settings="account"]').hidden=account.role==="member";
     const nav=[...content.querySelectorAll("[data-settings]")],panels=[...content.querySelectorAll(".settings-content>section")];
     nav.forEach(button=>button.onclick=()=>{
       nav.forEach(item=>item.setAttribute("aria-pressed",String(item===button)));
@@ -158,7 +160,11 @@
     if(action==="mascot"){window.OraculoMascot.toggle();closeMenu(true);}
     if(action==="invite")invite();
     if(action==="settings")settings();
-    if(action==="admin" && account?.admin_access && account.username==="felipe")openPanel("admin");
+    if(action==="team"){
+      closeMenu();
+      window.dispatchEvent(new CustomEvent("oraculo:team-login"));
+    }
+    if(action==="admin" && account?.admin_access)openPanel("admin");
     if(action==="logout"){
       closeMenu();
       try{await post("/api/logout",{});window.dispatchEvent(new CustomEvent("oraculo:account",{detail:{user:null,permissions:{}}}));location.reload();}
@@ -189,11 +195,13 @@
     account=event.detail.user;permissions=event.detail.permissions||{};
     if(account)loadLayout();else{layout={...defaults};applyLayout();}
     syncAccountPosition();
-    menu.querySelector('[data-profile="admin"]').hidden=!(account?.admin_access && account.username==="felipe");
+    menu.querySelector('[data-profile="team"]').hidden=account?.role!=="member";
+    menu.querySelector('[data-profile="admin"]').hidden=!account?.admin_access;
+    menu.querySelector('[data-profile="logout"]').hidden=account?.role==="member";
     closeMenu();
     if(dialog.open)dialog.close();
     menu.querySelector("#profileName").textContent=account?.display_name||"";
-    menu.querySelector("#profileRole").textContent=account?(account.role==="owner"?"Dev-chefe":"Administrador"):"";
+    menu.querySelector("#profileRole").textContent=account?(account.role==="owner"?"Dev-chefe":account.role==="admin"?"Administrador":"Perfil local"):"";
   });
   window.addEventListener("oraculo:mascot",event=>{
     const menuMascot=menu.querySelector('[data-profile="mascot"] .menu-label');

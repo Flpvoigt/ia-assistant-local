@@ -2,7 +2,9 @@
 
 Landing page estática. A Vercel publica somente `public`; nenhuma configuração ou chave do aplicativo é enviada.
 
-Copie `../dist/installer/Oraculo-Setup.exe` para `public/downloads/Oraculo-Setup.exe` antes de publicar. Ao trocar a versão, atualize tamanho, versão e SHA-256 na página.
+O script `../scripts/windows/build.ps1` copia o instalador para `public/downloads` e
+gera `public/update.json` com versão, tamanho e SHA-256. O site lê esses dados
+automaticamente.
 
 Preview: `python -m http.server 4173 --directory public`.
-Publicação: `vercel deploy --prod`.
+Publicação completa: `../scripts/windows/publish-release.ps1`.

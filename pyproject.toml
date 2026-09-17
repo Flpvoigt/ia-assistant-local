@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ia-assistant-local"
-version = "0.1.0"
+version = "0.2.1"
 description = "Assistente local seguro para computador e Home Assistant"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"

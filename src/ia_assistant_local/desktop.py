@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
+import sys
 import threading
 import tkinter as tk
 from pathlib import Path
@@ -12,6 +14,8 @@ import httpx
 from .core.config import APP_DATA_ROOT, BUNDLE_ROOT, ENV_PATH
 from .core.voice import install_voice_assets, voice_status, warm_voice
 from .web.server import HOST, PORT, create_server
+
+PID_FILE = APP_DATA_ROOT / "oraculo.pid"
 
 
 def _read_env_value(path: Path, key: str) -> str:
@@ -122,7 +126,7 @@ def _show_created_accounts(accounts: list[tuple[str, str]]) -> None:
     root.configure(bg="#100d16")
     title = tk.Label(
         root,
-        text="Guarde estas senhas temporárias",
+        text="Acesso opcional da equipe",
         bg="#100d16",
         fg="#f4edff",
         font=("Segoe UI", 16, "bold"),
@@ -130,7 +134,10 @@ def _show_created_accounts(accounts: list[tuple[str, str]]) -> None:
     title.pack(pady=(24, 8))
     note = tk.Label(
         root,
-        text="Elas aparecem somente nesta primeira instalação e devem ser alteradas no login.",
+        text=(
+            "O Oráculo abre sem login. Guarde estas credenciais somente se você "
+            "for usar a área administrativa."
+        ),
         bg="#100d16",
         fg="#aaa1b5",
         font=("Segoe UI", 9),
@@ -187,7 +194,7 @@ def _prepare_voice() -> None:
         return
 
 
-def main() -> None:
+def _run_desktop() -> None:
     _prepare_user_config()
     if not _require_personal_groq_key():
         return
@@ -240,6 +247,35 @@ def main() -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def _start_updater(*arguments: str) -> None:
+    updater = Path(sys.executable).with_name("OraculoUpdater.exe")
+    if not getattr(sys, "frozen", False) or not updater.is_file():
+        return
+    try:
+        subprocess.Popen(
+            [str(updater), *arguments],
+            close_fds=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except OSError:
+        return
+
+
+def main() -> None:
+    APP_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+    PID_FILE.write_text(str(os.getpid()), encoding="utf-8")
+    _start_updater("--scheduled")
+    try:
+        _run_desktop()
+    finally:
+        try:
+            if PID_FILE.read_text(encoding="utf-8").strip() == str(os.getpid()):
+                PID_FILE.unlink(missing_ok=True)
+        except OSError:
+            pass
+        _start_updater("--apply-pending", "--wait-pid", str(os.getpid()))
 
 
 if __name__ == "__main__":

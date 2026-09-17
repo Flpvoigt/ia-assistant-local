@@ -1,5 +1,5 @@
 #define AppName "Oráculo"
-#define AppVersion "0.1.0"
+#define AppVersion "0.2.1"
 #define AppPublisher "Equipe Oráculo"
 #define AppExeName "Oraculo.exe"
 
@@ -11,10 +11,12 @@ AppPublisher={#AppPublisher}
 DefaultDirName={localappdata}\Programs\Oraculo
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
-OutputDir=..\dist\installer
+OutputDir=..\..\dist\installer
 OutputBaseFilename=Oraculo-Setup
-SetupIconFile=..\build\windows\oraculo.ico
+SetupIconFile=..\..\build\windows\oraculo.ico
 UninstallDisplayIcon={app}\{#AppExeName}
+CloseApplications=yes
+RestartApplications=no
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -28,11 +30,13 @@ Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortugue
 Name: "desktopicon"; Description: "Criar atalho na Área de Trabalho"; GroupDescription: "Atalhos adicionais:"; Flags: unchecked
 
 [Files]
-Source: "..\dist\Oraculo\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\dist\Oraculo\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExeName}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
+Name: "{userstartup}\Oráculo Atualizador"; Filename: "{app}\OraculoUpdater.exe"; Parameters: "--scheduled"; WorkingDir: "{app}"; IconFilename: "{app}\{#AppExeName}"; Flags: runminimized
 
 [Run]
+Filename: "{app}\OraculoUpdater.exe"; Parameters: "--scheduled"; Flags: nowait runhidden skipifsilent
 Filename: "{app}\{#AppExeName}"; Description: "Abrir o {#AppName}"; Flags: nowait postinstall skipifsilent

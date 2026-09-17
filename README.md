@@ -53,9 +53,35 @@ deve ser enviado ao Git. Para encerrar, pressione `Ctrl+C` no terminal.
 
 O Oráculo também pode ser distribuído como aplicativo de desktop. Quem instalar não precisa ter Python, Codex ou acesso ao código-fonte. Na primeira abertura, cada pessoa deve informar a própria chave da Groq; nenhuma chave pessoal é incluída no instalador.
 
-Para gerar o aplicativo e o instalador, execute `.\build-windows.ps1`. O arquivo final será criado em `dist\installer\Oraculo-Setup.exe`. As configurações, o banco local e os modelos de voz ficam em `%LOCALAPPDATA%\Oraculo`.
+Depois de informar a chave, o aplicativo abre diretamente no perfil local. Login
+é solicitado somente quando alguém escolhe **Acesso da equipe** para usar uma das
+contas administrativas autorizadas.
 
-Para gerar somente a pasta executável, use `.\build-windows.ps1 -SkipInstaller`.
+Para gerar o aplicativo e o instalador, execute `.\scripts\windows\build.ps1`. O arquivo final será criado em `dist\installer\Oraculo-Setup.exe`. As configurações, o banco local e os modelos de voz ficam em `%LOCALAPPDATA%\Oraculo`.
+
+Para gerar somente a pasta executável, use `.\scripts\windows\build.ps1 -SkipInstaller`.
+
+### Atualizações automáticas do aplicativo
+
+A partir da versão 0.2.0, o instalador registra o `OraculoUpdater.exe` para
+verificar novas versões quando o usuário entra no Windows. O Oráculo também
+dispara uma verificação ao abrir. O atualizador consulta o manifesto HTTPS
+`https://oraculo-desktop.vercel.app/update.json`, baixa o novo instalador e
+confere tamanho e SHA-256 antes de executá-lo.
+
+Se o Oráculo estiver aberto, a atualização fica preparada em
+`%LOCALAPPDATA%\Oraculo\updates` e é instalada silenciosamente depois que o
+aplicativo fechar. Conversas, memórias, modelos de voz e a chave Groq ficam fora
+da pasta de instalação e são preservados.
+
+Para gerar o instalador, atualizar o manifesto e publicar tudo na Vercel:
+
+```powershell
+.\scripts\windows\publish-release.ps1
+```
+
+Quem já possui uma versão anterior à 0.2.0 precisa instalar esta versão uma vez
+pelo site. As versões seguintes poderão ser recebidas pelo atualizador.
 
 Instalacao manual, caso scripts PowerShell estejam bloqueados:
 
@@ -88,15 +114,15 @@ O Oráculo exige Python 3.11, 3.12 ou 3.13. No macOS, o ambiente virtual usa
 Se o Terminal estiver fora da pasta do projeto, use `cd` até a pasta
 `ia-assistant-local` antes dos comandos.
 
-Na primeira inicializacao, o terminal mostra senhas temporarias para as tres contas
-administrativas: `will`, `gustavo` e `felipe`. Cada pessoa deve entrar com a
-propria conta e trocar a senha temporaria. As senhas sao armazenadas como hashes
-`scrypt`, nunca em texto puro.
+O aplicativo entra automaticamente no perfil local `oraculo`, sem cadastro ou
+senha. O histórico e as memórias desse perfil ficam no banco local
+`data/oraculo.db`, que não é enviado ao Git. Cada instalação possui seus próprios
+dados e cada entrada abre uma conversa nova e limpa.
 
-O historico e as memorias ficam separados por conta no banco local
-`data/oraculo.db`, que tambem nao e enviado ao Git. Cada entrada abre uma conversa
-nova e limpa; conversas anteriores aparecem na barra lateral e podem ser reabertas
-ou excluidas.
+As contas administrativas `will`, `gustavo` e `felipe` continuam disponíveis no
+menu **Acesso da equipe**. Na primeira inicialização, suas senhas temporárias são
+mostradas uma única vez. Elas usam hashes `scrypt` e precisam ser trocadas no
+primeiro acesso. O perfil local nunca recebe acesso à central administrativa.
 
 A interface possui seletor de modelo salvo por usuario, chat temporario que nao
 grava historico nem memorias, uma sala compartilhada entre os tres criadores,

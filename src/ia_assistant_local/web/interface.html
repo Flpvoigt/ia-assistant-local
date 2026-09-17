@@ -947,8 +947,8 @@
 <div class="auth-overlay" id="authOverlay" hidden>
   <div class="auth-card">
     <form id="loginForm">
-      <h2>Entrar no Oráculo</h2>
-      <p> Acesso restrito apenas para usuários com permissão administrativa.</p>
+      <h2>Acesso da equipe</h2>
+      <p>Login restringindo a equipe de desenvolvimento. Use sua conta de e-mail para entrar.</p>
       <input id="loginUser" autocomplete="username" placeholder="Usuário" required>
       <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Senha" required>
       <button class="btn primary" type="submit">Entrar</button>
@@ -960,6 +960,7 @@
       <input id="newPassword" type="password" autocomplete="new-password" placeholder="Nova senha" minlength="10" required>
       <button class="btn primary" type="submit">Salvar nova senha</button>
     </form>
+    <button class="btn" id="cancelLogin" type="button">Voltar ao perfil local</button>
     <div class="connmsg" id="authMessage"></div>
   </div>
 </div>
@@ -992,7 +993,7 @@
     <div class="user-avatar" id="userAvatar">?</div>
     <div class="user-details">
       <strong id="sidebarCurrentUser">—</strong>
-      <span id="sidebarUserRole">administrador</span>
+      <span id="sidebarUserRole">perfil local</span>
     </div>
     <span aria-hidden="true">⌃</span>
     </button>
@@ -2490,7 +2491,7 @@
     applyPermissions(permissionData.permissions);
     window.dispatchEvent(new CustomEvent("oraculo:account", {detail:{user, permissions:permissionData.permissions}}));
     sidebarCurrentUser.textContent = user.display_name;
-    sidebarUserRole.textContent = user.role === "owner" ? "dev-chefe" : "administrador";
+    sidebarUserRole.textContent = user.role === "owner" ? "dev-chefe" : user.role === "admin" ? "administrador" : "perfil local";
     userAvatar.textContent = user.display_name.slice(0, 2).toUpperCase();
     chatSidebar.hidden = false;
     document.body.classList.add("sidebar-open");
@@ -2512,17 +2513,7 @@
     authOverlay.hidden = false;
     loginForm.hidden = false;
     changePasswordForm.hidden = true;
-    sidebarCurrentUser.textContent = "—";
-    sidebarUserRole.textContent = "administrador";
-    userAvatar.textContent = "?";
-    currentAccount = null;
-    window.dispatchEvent(new CustomEvent("oraculo:account", {detail:{user:null, permissions:{}}}));
-    currentChatId = null;
-    currentPermissions = {};
-    applyModeTheme("private");
-    chatSidebar.hidden = true;
-    contextSidebar.hidden = true;
-    document.body.classList.remove("sidebar-open", "context-open");
+    document.getElementById("loginPassword").value = "";
     authMessage.textContent = message;
   }
 
@@ -2572,8 +2563,15 @@
   document.getElementById("sidebarLogoutBtn").addEventListener("click", async ()=>{
     await api("/api/logout", {method:"POST"});
     log.innerHTML = "";
-    showLogin("Sessão encerrada.");
+    const data = await api("/api/me");
+    await activateUser(data.user);
   });
+  document.getElementById("cancelLogin").addEventListener("click", async ()=>{
+    await api("/api/logout", {method:"POST"});
+    const data = await api("/api/me");
+    await activateUser(data.user);
+  });
+  window.addEventListener("oraculo:team-login", ()=>showLogin());
 
   document.getElementById("newChatBtn").addEventListener("click", startNewChat);
   document.getElementById("temporaryChatBtn").addEventListener("click", startTemporaryChat);
@@ -2969,7 +2967,9 @@
         await activateUser(data.user);
       }
     }catch(_err){
-      showLogin();
+      authMessage.textContent = "Não foi possível abrir o perfil local.";
+      authOverlay.hidden = false;
+      loginForm.hidden = true;
     }
   })();
 
